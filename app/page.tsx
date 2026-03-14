@@ -219,14 +219,9 @@ export default function Page() {
       <footer className="border-t border-white/10 bg-black/60">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
           <div className="text-sm text-zinc-400">
-            Privater Fahrzeughandel · Showroom Seite im GVMP Stil
+            Escobar Fahrzeughandel · Showroom Seite
           </div>
-          <a
-            href="/studio"
-            className="self-start text-xs text-zinc-500 transition hover:text-amber-300"
-          >
-            admin / cms
-          </a>
+          
         </div>
       </footer>
        {selectedVehicle && (
