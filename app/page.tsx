@@ -275,7 +275,12 @@ Top Speed
           <div className="text-sm text-zinc-400">
             Escobar Fahrzeughandel · Showroom Seite
           </div>
-          
+          <a
+      href="/studio"
+      className="text-xs text-zinc-500 transition hover:text-amber-300"
+    >
+      admin
+    </a>
         </div>
       </footer>
        {selectedVehicle && (
