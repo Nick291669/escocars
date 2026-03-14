@@ -2,8 +2,8 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'GVMP Autohaus',
-  description: 'Privater Fahrzeughandel im GVMP Stil',
+  title: 'Esco Cars',
+  description: 'Privater Fahrzeughandel',
 }
 
 export default function RootLayout({
