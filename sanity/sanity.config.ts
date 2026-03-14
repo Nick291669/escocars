@@ -8,6 +8,7 @@ export default defineConfig({
   title: 'GVMP Autohaus CMS',
   projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || '6lv81j4f',
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
+  basePath: '/studio',
   plugins: [structureTool(), visionTool()],
   schema: {
     types: schemaTypes,

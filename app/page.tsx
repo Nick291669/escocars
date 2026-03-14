@@ -51,14 +51,18 @@ export default function Page() {
   const [loading, setLoading] = useState(true)
 
   async function loadData() {
-    const [vehicleData, postData] = await Promise.all([
-      client.fetch(vehiclesQuery),
-      client.fetch(postsQuery),
-    ])
-    setVehicles(vehicleData)
-    setPosts(postData)
-    setLoading(false)
-  }
+  const [vehicleData, postData] = await Promise.all([
+    client.fetch(vehiclesQuery),
+    client.fetch(postsQuery),
+  ])
+
+  console.log('vehicleData', vehicleData)
+  console.log('postData', postData)
+
+  setVehicles(vehicleData)
+  setPosts(postData)
+  setLoading(false)
+}
 
   useEffect(() => {
     loadData()
