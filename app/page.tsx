@@ -36,7 +36,7 @@ type Post = {
   text: string
 }
 
-const categories = ['Alle', 'Limousine', 'Coupé', 'Sportwagen', 'SUV']
+const categories = ['Alle', 'Limousine', 'Coupé', 'Sportwagen', 'SUV', 'Supersportwagen', 'Industriefahrzeuge', 'Flugzeuge', 'Klassiker', 'Motorräder', 'Import']
 
 export default function Page() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
