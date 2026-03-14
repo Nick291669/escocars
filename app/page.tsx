@@ -27,6 +27,7 @@ type Vehicle = {
   tank: string
   stock: number
   status: string
+  transmission: string
   badge: string
   description: string
   heroImage?: SanityImage
@@ -157,103 +158,118 @@ export default function Page() {
           </div>
 
              {loading ? (
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-10 text-center text-zinc-300">
-              Fahrzeuge werden geladen ...
+  <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-10 text-center text-zinc-300">
+    Fahrzeuge werden geladen ...
+  </div>
+) : (
+  <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    {filteredVehicles.map((vehicle) => (
+      <button
+        key={vehicle._id}
+        onClick={() => openVehicle(vehicle)}
+        className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] text-left transition duration-300 hover:-translate-y-1 hover:border-amber-400/30 hover:bg-white/[0.06]"
+      >
+        <div className="relative h-64 overflow-hidden">
+          <img
+            src={getImage(vehicle.heroImage) || '/fallback-car.jpg'}
+            alt={vehicle.title || 'Fahrzeug'}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+
+          <div className="absolute left-4 top-4 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs text-amber-100">
+            {vehicle.badge || 'Fahrzeug'}
+          </div>
+
+          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xl font-semibold">{vehicle.title || '-'}</div>
+              <div className="mt-1 text-sm text-zinc-300">
+                {vehicle.brand || '-'} · {vehicle.category || '-'}
+              </div>
             </div>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {filteredVehicles.map((vehicle) => (
-                <button
-                  key={vehicle._id}
-                  onClick={() => openVehicle(vehicle)}
-                  className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] text-left transition duration-300 hover:-translate-y-1 hover:border-amber-400/30 hover:bg-white/[0.06]"
-                >
-                  <div className="relative h-64 overflow-hidden">
-                    <img src={getImage(vehicle.heroImage)} alt={vehicle.title} className="h-full w-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                    <div className="absolute left-4 top-4 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs text-amber-100">
-                      {vehicle.badge}
-                    </div>
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-xl font-semibold">{vehicle.title}</div>
-                        <div className="mt-1 text-sm text-zinc-300">{vehicle.brand} · {vehicle.category}</div>
-                      </div>
-                      <div className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-zinc-100">
-                        {vehicle.status}
-                      </div>
-                    </div>
-                  </div>
-                    <div className="p-6">
-                    <p className="leading-7 text-zinc-300">{vehicle.description}</p>
-                    <div className="mt-5 grid grid-cols-2 gap-3 text-sm text-zinc-200">
 
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Preis
-<br />
-<span className="text-amber-300">{vehicle.price}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Bestand
-<br />
-<span className="text-amber-300">{vehicle.stock}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-KM
-<br />
-<span className="text-amber-300">{vehicle.mileage}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Kraftstoff
-<br />
-<span className="text-amber-300">{vehicle.fuel}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Kategorie
-<br />
-<span className="text-amber-300">{vehicle.category}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Steuerkosten
-<br />
-<span className="text-amber-300">{vehicle.taxCost}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Kofferraum
-<br />
-<span className="text-amber-300">{vehicle.trunk}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Tankvermögen
-<br />
-<span className="text-amber-300">{vehicle.tank}</span>
-</div>
-
-<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-Top Speed
-<br />
-<span className="text-amber-300">{vehicle.topSpeed}</span>
-</div>
-
-</div>
-                  </div>
-                </button>
-              ))}
+            <div className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-zinc-100">
+              {vehicle.status || '-'}
             </div>
-          )}
+          </div>
+        </div>
 
-          {!loading && filteredVehicles.length === 0 && (
-            <div className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-10 text-center text-zinc-300">
-              Keine Fahrzeuge für diese Suche gefunden.
+        <div className="p-6">
+          <p className="leading-7 text-zinc-300">{vehicle.description || 'Keine Beschreibung vorhanden.'}</p>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 text-sm text-zinc-200">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Preis
+              <br />
+              <span className="text-amber-300">{vehicle.price || '-'}</span>
             </div>
-          )}
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Bestand
+              <br />
+              <span className="text-amber-300">{vehicle.stock ?? '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              KM
+              <br />
+              <span className="text-amber-300">{vehicle.mileage || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Getriebe
+              <br />
+              <span className="text-amber-300">{vehicle.transmission || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Kraftstoff
+              <br />
+              <span className="text-amber-300">{vehicle.fuel || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Kategorie
+              <br />
+              <span className="text-amber-300">{vehicle.category || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Steuerkosten
+              <br />
+              <span className="text-amber-300">{vehicle.taxCost || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Kofferraum
+              <br />
+              <span className="text-amber-300">{vehicle.trunk || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Tankvermögen
+              <br />
+              <span className="text-amber-300">{vehicle.tank || '-'}</span>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              Top Speed
+              <br />
+              <span className="text-amber-300">{vehicle.topSpeed || '-'}</span>
+            </div>
+          </div>
+        </div>
+      </button>
+    ))}
+  </div>
+)}
+
+{!loading && filteredVehicles.length === 0 && (
+  <div className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-10 text-center text-zinc-300">
+    Keine Fahrzeuge für diese Suche gefunden.
+  </div>
+)}
         </section>
          <section className="mx-auto max-w-7xl px-6 pb-24 pt-4">
           <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-8">
