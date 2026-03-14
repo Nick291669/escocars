@@ -93,7 +93,7 @@ export default function Page() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.45em] text-amber-400">GVMP Premium Showroom</div>
+            <div className="text-[10px] uppercase tracking-[0.45em] text-amber-400">ESCOBAR CARS Premium Showroom</div>
             <div className="mt-1 text-lg font-semibold">Privater Fahrzeughandel</div>
           </div>
           <div className="hidden rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm text-amber-100 md:block">
