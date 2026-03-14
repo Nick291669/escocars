@@ -214,13 +214,49 @@ export default function Page() {
             </div>
           </div>
         </section>
+
+<section className="mx-auto max-w-7xl px-6 pb-16 pt-8">
+  <div className="border-t border-b border-white/10 py-10">
+
+    <h3 className="text-center text-lg font-semibold text-white mb-6">
+      Disclaimer
+    </h3>
+
+    <p className="text-center text-sm text-zinc-400 leading-7 max-w-4xl mx-auto">
+      Dieses Projekt sowie sämtliche darin enthaltenen Inhalte stehen in <span className="font-semibold text-zinc-200">keinerlei Verbindung zu GVMP</span>. 
+      GVMP ist weder an der Erstellung beteiligt noch verantwortlich für veröffentlichte Informationen, Darstellungen oder Aussagen. 
+      Alle genannten Inhalte entstehen unabhängig und ohne Zustimmung oder Einflussnahme von GVMP.
+    </p>
+
+    <div className="my-8 border-t border-white/10"></div>
+
+    <p className="text-center text-sm text-zinc-400 leading-7 max-w-4xl mx-auto">
+      Diese Webseite ist nur für Spieler, welche auf dem Rollenspiel Server von GVMP.de spielen, bestimmt. 
+      Der Inhalt dient zum erweiterten Spielerlebnis und ist somit nur als Bestandteil zusammen mit dem Spiel gedacht. 
+      Bei dieser Webseite handelt es sich um ein fiktives Unternehmen auf dem Server und somit um keine reale Firma. 
+      Ähnlichkeiten mit Institutionen, lebenden oder verstorbenen Personen, sowie Unternehmen oder Vereinen sind rein zufälliger Natur 
+      und nicht beabsichtigt bzw. geben nicht unbedingt unsere Meinung wieder. Diese Webseite ist lediglich Gegenstand eines 
+      Roleplay-Servers und soll auch nur als solches gesehen werden.
+    </p>
+
+  </div>
+</section>
+
+
+
       </main>
+
+
+
+
 
       <footer className="border-t border-white/10 bg-black/60">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
           <div className="text-sm text-zinc-400">
             Escobar Fahrzeughandel · Showroom Seite
           </div>
+          
+          
           <a
       href="/studio"
       className="text-xs text-zinc-500 transition hover:text-amber-300"

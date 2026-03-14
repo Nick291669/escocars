@@ -12,7 +12,7 @@ export const vehicleType = defineType({
       title: 'Kategorie',
       type: 'string',
       options: {
-        list: ['Limousine', 'Coupé', 'Sportwagen', 'SUV', 'Supersportwagen'],
+        list: ['Limousine', 'Coupé', 'Sportwagen', 'SUV', 'Supersportwagen', 'Industriefahrzeuge', 'Flugzeuge', 'Klassiker', 'Motorräder', 'Import'],
       },
     }),
     defineField({name: 'price', title: 'Preis', type: 'string'}),
