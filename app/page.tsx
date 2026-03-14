@@ -21,7 +21,10 @@ type Vehicle = {
   price: string
   mileage: string
   fuel: string
-  transmission: string
+  taxCost: string
+  trunk: string
+  topSpeed: string
+  tank: string
   stock: number
   status: string
   badge: string
@@ -180,11 +183,62 @@ export default function Page() {
                     <div className="p-6">
                     <p className="leading-7 text-zinc-300">{vehicle.description}</p>
                     <div className="mt-5 grid grid-cols-2 gap-3 text-sm text-zinc-200">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">Preis<br /><span className="text-amber-300">{vehicle.price}</span></div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">Bestand<br /><span className="text-amber-300">{vehicle.stock}</span></div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">KM<br /><span className="text-amber-300">{vehicle.mileage}</span></div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">Getriebe<br /><span className="text-amber-300">{vehicle.transmission}</span></div>
-                    </div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Preis
+<br />
+<span className="text-amber-300">{vehicle.price}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Bestand
+<br />
+<span className="text-amber-300">{vehicle.stock}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+KM
+<br />
+<span className="text-amber-300">{vehicle.mileage}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Kraftstoff
+<br />
+<span className="text-amber-300">{vehicle.fuel}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Kategorie
+<br />
+<span className="text-amber-300">{vehicle.category}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Steuerkosten
+<br />
+<span className="text-amber-300">{vehicle.taxCost}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Kofferraum
+<br />
+<span className="text-amber-300">{vehicle.trunk}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Tankvermögen
+<br />
+<span className="text-amber-300">{vehicle.tank}</span>
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+Top Speed
+<br />
+<span className="text-amber-300">{vehicle.topSpeed}</span>
+</div>
+
+</div>
                   </div>
                 </button>
               ))}
@@ -270,7 +324,6 @@ export default function Page() {
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Preis<br /><span className="text-lg text-amber-300">{selectedVehicle.price}</span></div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Bestand<br /><span className="text-lg text-amber-300">{selectedVehicle.stock}</span></div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">KM<br /><span className="text-amber-300">{selectedVehicle.mileage}</span></div>
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Getriebe<br /><span className="text-amber-300">{selectedVehicle.transmission}</span></div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Kraftstoff<br /><span className="text-amber-300">{selectedVehicle.fuel}</span></div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Kategorie<br /><span className="text-amber-300">{selectedVehicle.category}</span></div>
                 </div>
