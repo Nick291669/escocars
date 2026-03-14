@@ -6,16 +6,13 @@ export const vehiclesQuery = `*[_type == "vehicle"] | order(_createdAt desc) {
   price,
   mileage,
   fuel,
+  transmission,
   stock,
   status,
   badge,
   description,
   heroImage,
   gallery
-  taxCost,
-  trunk,
-  tank,
-  topSpeed
 }`
 
 export const postsQuery = `*[_type == "post"] | order(_createdAt desc) {
