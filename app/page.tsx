@@ -71,9 +71,14 @@ export default function Page() {
         vehicle.title?.toLowerCase().includes(search.toLowerCase()) ||
         vehicle.brand?.toLowerCase().includes(search.toLowerCase()) ||
         vehicle.category?.toLowerCase().includes(search.toLowerCase())
+        
+
       return categoryMatch && searchMatch
     })
   }, [vehicles, selectedCategory, search])
+
+  const showroomVehicles = filteredVehicles.filter((v) => v.badge?.toLowerCase() !== "verkauft")
+  const soldVehicles = filteredVehicles.filter((v) => v.badge?.toLowerCase() === "verkauft")
 
   function getImage(image?: SanityImage) {
     return image ? urlFor(image).width(1200).height(800).url() : ''
@@ -159,7 +164,7 @@ export default function Page() {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {filteredVehicles.map((vehicle) => (
+              {showroomVehicles.map((vehicle) => (
                 <button
                   key={vehicle._id}
                   onClick={() => openVehicle(vehicle)}
@@ -217,6 +222,67 @@ export default function Page() {
               ))}
             </div>
           </div>
+
+          {soldVehicles.length > 0 && (
+<section className="mx-auto max-w-7xl px-6 py-16">
+
+  <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div>
+      <div className="text-xs uppercase tracking-[0.45em] text-amber-400">
+        Sold Vehicles
+      </div>
+      <h2 className="mt-3 text-3xl font-semibold md:text-5xl">
+        Bereits verkauft
+      </h2>
+    </div>
+
+    <p className="max-w-2xl text-zinc-400 leading-8">
+      Diese Fahrzeuge wurden bereits erfolgreich verkauft.
+    </p>
+  </div>
+
+  <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+
+    {soldVehicles.map((vehicle) => (
+
+      <div
+        key={vehicle._id}
+        className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] opacity-70"
+      >
+
+        <div className="relative h-64 overflow-hidden">
+
+          <img
+            src={getImage(vehicle.heroImage)}
+            alt={vehicle.title}
+            className="h-full w-full object-cover grayscale"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+
+          <div className="absolute left-4 top-4 rounded-full border border-red-400/30 bg-red-400/10 px-3 py-1 text-xs text-red-200">
+            Verkauft
+          </div>
+
+        </div>
+
+        <div className="p-6">
+          <div className="text-xl font-semibold">{vehicle.title}</div>
+          <div className="mt-1 text-sm text-zinc-400">
+            {vehicle.brand} · {vehicle.category}
+          </div>
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+
+</section>
+)}
+
+
         </section>
 
 <section className="mx-auto max-w-7xl px-6 pb-16 pt-8">
