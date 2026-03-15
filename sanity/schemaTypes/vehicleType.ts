@@ -22,6 +22,10 @@ export const vehicleType = defineType({
     defineField({name: 'stock', title: 'Bestand', type: 'number'}),
     defineField({name: 'status', title: 'Status', type: 'string'}),
     defineField({name: 'badge', title: 'Badge', type: 'string'}),
+    defineField({name: 'tax', title: 'Steuerkosten', type: 'string'}),
+    defineField({name: 'Kofferraum', title: 'Kofferraum', type: 'string'}),
+    defineField({name: 'Tank', title: 'Tankvermögen', type: 'string'}),
+    defineField({name: 'Speed', title: 'Top-Speed', type: 'string'}),
     defineField({name: 'description', title: 'Beschreibung', type: 'text'}),
     defineField({name: 'heroImage', title: 'Hauptbild', type: 'image', options: {hotspot: true}}),
     defineField({

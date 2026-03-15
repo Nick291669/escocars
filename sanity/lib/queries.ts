@@ -10,6 +10,10 @@ export const vehiclesQuery = `*[_type == "vehicle"] | order(_createdAt desc) {
   stock,
   status,
   badge,
+  tax,
+  Kofferraum,
+  Tank,
+  Speed,
   description,
   heroImage,
   gallery
