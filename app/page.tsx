@@ -25,6 +25,10 @@ type Vehicle = {
   stock: number
   status: string
   badge: string
+  tax: string
+  Kofferraum: string
+  Tank: string
+  Speed: string
   description: string
   heroImage?: SanityImage
   gallery?: SanityImage[]
@@ -312,6 +316,10 @@ export default function Page() {
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Getriebe<br /><span className="text-amber-300">{selectedVehicle.transmission}</span></div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Kraftstoff<br /><span className="text-amber-300">{selectedVehicle.fuel}</span></div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Kategorie<br /><span className="text-amber-300">{selectedVehicle.category}</span></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Steuerkosten<br /><span className="text-amber-300">{selectedVehicle.tax}</span></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Kofferraum<br /><span className="text-amber-300">{selectedVehicle.Kofferraum}</span></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Tankvermögen<br /><span className="text-amber-300">{selectedVehicle.Tank}</span></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4">Top-Speed<br /><span className="text-amber-300">{selectedVehicle.Speed}</span></div>
                 </div>
                 <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
                   <div className="text-sm uppercase tracking-[0.28em] text-amber-400">Beschreibung</div>
