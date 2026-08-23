@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { client, urlFor } from '@/sanity/lib/client'
 import { postsQuery, trailersQuery } from '@/sanity/lib/queries'
 
@@ -209,12 +210,12 @@ export default function Page() {
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
-            <button className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-200 transition hover:bg-white/5">
+            <Link href="/konto" className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-200 transition hover:bg-white/5">
               Kundenbereich
-            </button>
-            <button onClick={scrollToFleet} className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-300">
+            </Link>
+            <Link href="/mieten" className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-300">
               Jetzt mieten
-            </button>
+            </Link>
           </div>
 
           <button onClick={() => setMobileMenu(!mobileMenu)} className="rounded-xl border border-white/10 p-2.5 text-zinc-200 md:hidden" aria-label="Menü öffnen">
@@ -230,7 +231,7 @@ export default function Page() {
               <a onClick={() => setMobileMenu(false)} href="#vorteile">Vorteile</a>
               <a onClick={() => setMobileMenu(false)} href="#faq">FAQ</a>
               <a onClick={() => setMobileMenu(false)} href="#kontakt">Kontakt</a>
-              <button onClick={() => { setMobileMenu(false); scrollToFleet() }} className="mt-2 rounded-xl bg-amber-400 px-4 py-3 font-semibold text-black">Jetzt mieten</button>
+              <Link onClick={() => setMobileMenu(false)} href="/mieten" className="mt-2 rounded-xl bg-amber-400 px-4 py-3 text-center font-semibold text-black">Jetzt mieten</Link>
             </div>
           </div>
         )}
@@ -280,9 +281,9 @@ export default function Page() {
                   </label>
                 </div>
 
-                <button onClick={scrollToFleet} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 font-semibold text-black transition hover:bg-amber-300">
-                  Verfügbare Anhänger anzeigen <Icon name="arrow" />
-                </button>
+                <Link href={`/mieten?from=${encodeURIComponent(pickupDate)}&to=${encodeURIComponent(returnDate)}`} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 font-semibold text-black transition hover:bg-amber-300">
+                  Verfügbarkeit prüfen <Icon name="arrow" />
+                </Link>
 
                 <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 rounded-xl border border-white/10 bg-black/20 py-4 text-center">
                   <div><div className="text-lg font-semibold text-white">ab 25 €</div><div className="mt-1 text-[11px] text-zinc-500">pro Tag</div></div>
@@ -466,7 +467,7 @@ export default function Page() {
                 <div className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-400">Bereit für dein Projekt?</div>
                 <h2 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">Finde jetzt den passenden Anhänger.</h2>
                 <p className="mt-5 max-w-2xl leading-8 text-zinc-400">Wähle deinen Mietzeitraum und entdecke die passenden Anhänger für deinen Transport.</p>
-                <button onClick={scrollToFleet} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Verfügbarkeit prüfen <Icon name="arrow" /></button>
+                <Link href="/mieten" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Verfügbarkeit prüfen <Icon name="arrow" /></Link>
               </div>
               <div className="grid gap-3 text-sm text-zinc-300 sm:grid-cols-2 lg:grid-cols-1">
                 <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4"><Icon name="pin" className="h-5 w-5 text-amber-400" /><span>Standort wird noch eingetragen</span></div>
@@ -534,7 +535,7 @@ export default function Page() {
                 <div className="mt-6 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] p-5">
                   <div className="flex items-end justify-between gap-3"><div><div className="text-xs text-zinc-500">Mietpreis ab</div><div className="mt-1 text-3xl font-semibold">{selectedTrailer.pricePerDay || 'Auf Anfrage'} <span className="text-sm font-normal text-zinc-500">/ Tag</span></div></div><div className="text-right text-xs text-zinc-500">Kaution<br/><span className="text-sm text-zinc-300">{selectedTrailer.deposit || '—'}</span></div></div>
                   <div className="mt-5 grid gap-3 sm:grid-cols-2"><input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} className="rounded-xl border border-white/10 bg-black/25 px-3 py-3 text-sm [color-scheme:dark]"/><input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="rounded-xl border border-white/10 bg-black/25 px-3 py-3 text-sm [color-scheme:dark]"/></div>
-                  <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Diesen Anhänger mieten <Icon name="arrow" /></button>
+                  <Link href={`/mieten?trailer=${encodeURIComponent(selectedTrailer._id)}&from=${encodeURIComponent(pickupDate)}&to=${encodeURIComponent(returnDate)}`} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Diesen Anhänger mieten <Icon name="arrow" /></Link>
                 </div>
                 <p className="mt-4 text-[11px] leading-5 text-zinc-600">* Die tatsächlich benötigte Führerscheinklasse hängt vom Zugfahrzeug und der zulässigen Gesamtmasse des Gespanns ab.</p>
               </div>
@@ -544,7 +545,7 @@ export default function Page() {
       )}
 
       <div className="fixed inset-x-3 bottom-3 z-30 md:hidden">
-        <button onClick={scrollToFleet} className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 text-sm font-semibold text-black shadow-2xl shadow-black/50">Anhänger mieten <Icon name="arrow" /></button>
+        <Link href="/mieten" className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 text-sm font-semibold text-black shadow-2xl shadow-black/50">Anhänger mieten <Icon name="arrow" /></Link>
       </div>
     </div>
   )
