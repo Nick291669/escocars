@@ -1,10 +1,11 @@
-export const trailersQuery = `*[_type == "trailer"] | order(_createdAt desc) {
+export const trailersQuery = `*[_type in ["trailer", "vehicle"]] | order(_createdAt desc) {
   _id,
+  _type,
   title,
   category,
-  shortDescription,
+  "shortDescription": coalesce(shortDescription, description),
   description,
-  pricePerDay,
+  "pricePerDay": coalesce(pricePerDay, price),
   weekendPrice,
   deposit,
   totalWeight,

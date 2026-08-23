@@ -13,6 +13,8 @@ type Booking = {
   total_price: number | null
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
   note: string
+  pickup_time: string | null
+  payment_method: 'cash' | 'online'
   created_at: string
 }
 
@@ -37,7 +39,7 @@ export default function AccountPage() {
       setEmail(auth.user.email || '')
       const [profileResult, bookingResult] = await Promise.all([
         supabase.from('profiles').select('full_name,phone').eq('id', auth.user.id).maybeSingle(),
-        supabase.from('bookings').select('id,trailer_title,start_date,end_date,days,total_price,status,note,created_at').eq('user_id', auth.user.id).order('start_date', { ascending: false }),
+        supabase.from('bookings').select('id,trailer_title,start_date,end_date,pickup_time,days,total_price,payment_method,status,note,created_at').eq('user_id', auth.user.id).order('start_date', { ascending: false }),
       ])
       if (profileResult.data) setProfile(profileResult.data)
       if (bookingResult.error) setError(bookingResult.error.message)
@@ -54,7 +56,7 @@ export default function AccountPage() {
 
   async function cancelBooking(id: string) {
     if (!window.confirm('Möchtest du diese Mietanfrage wirklich stornieren?')) return
-    const { error } = await supabase.from('bookings').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', id).eq('status', 'pending')
+    const { error } = await supabase.rpc('cancel_own_booking', { p_booking_id: id })
     if (error) return setError(error.message)
     setBookings((items) => items.map((item) => item.id === id ? { ...item, status: 'cancelled' } : item))
   }
@@ -79,7 +81,7 @@ export default function AccountPage() {
               {bookings.map((booking) => (
                 <article key={booking.id} className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-5 md:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-4"><div><div className="text-xs uppercase tracking-[0.18em] text-zinc-600">Buchung {booking.id.slice(0, 8).toUpperCase()}</div><h3 className="mt-2 text-xl font-semibold">{booking.trailer_title}</h3></div><span className={`rounded-full px-3 py-1 text-xs font-medium ${booking.status === 'confirmed' ? 'bg-emerald-400/10 text-emerald-300' : booking.status === 'cancelled' ? 'bg-red-400/10 text-red-300' : booking.status === 'completed' ? 'bg-zinc-400/10 text-zinc-300' : 'bg-amber-400/10 text-amber-300'}`}>{statusLabels[booking.status]}</span></div>
-                  <div className="mt-5 grid gap-3 text-sm sm:grid-cols-3"><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Abholung</div><div className="mt-1 text-zinc-300">{new Date(`${booking.start_date}T12:00:00`).toLocaleDateString('de-DE')}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Rückgabe</div><div className="mt-1 text-zinc-300">{new Date(`${booking.end_date}T12:00:00`).toLocaleDateString('de-DE')}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Preis</div><div className="mt-1 text-zinc-300">{booking.total_price == null ? 'Auf Anfrage' : `${Number(booking.total_price).toFixed(2).replace('.', ',')} €`}</div></div></div>
+                  <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3"><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Abholung</div><div className="mt-1 text-zinc-300">{new Date(`${booking.start_date}T12:00:00`).toLocaleDateString('de-DE')}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Abholzeit</div><div className="mt-1 text-zinc-300">{booking.pickup_time ? `${booking.pickup_time.slice(0, 5)} Uhr` : '—'}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Rückgabe</div><div className="mt-1 text-zinc-300">{new Date(`${booking.end_date}T12:00:00`).toLocaleDateString('de-DE')} · {booking.pickup_time ? `${booking.pickup_time.slice(0, 5)} Uhr` : '—'}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Preis</div><div className="mt-1 text-zinc-300">{booking.total_price == null ? 'Auf Anfrage' : `${Number(booking.total_price).toFixed(2).replace('.', ',')} €`}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Zahlungsart</div><div className="mt-1 text-zinc-300">{booking.payment_method === 'online' ? 'Online-Zahlung' : 'Barzahlung'}</div></div><div className="rounded-xl bg-black/20 p-3"><div className="text-xs text-zinc-600">Kaution</div><div className="mt-1 text-zinc-300">Immer bar</div></div></div>
                   {booking.note && <div className="mt-4 text-sm text-zinc-500"><span className="text-zinc-400">Hinweis:</span> {booking.note}</div>}
                   {booking.status === 'pending' && <div className="mt-5 border-t border-white/10 pt-4"><button onClick={() => cancelBooking(booking.id)} className="text-sm text-red-300 transition hover:text-red-200">Mietanfrage stornieren</button></div>}
                 </article>

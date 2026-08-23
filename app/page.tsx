@@ -2,8 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { client, urlFor } from '@/sanity/lib/client'
-import { postsQuery, trailersQuery } from '@/sanity/lib/queries'
+import { urlFor } from '@/sanity/lib/client'
 
 type SanityImage = {
   _type: 'image'
@@ -50,62 +49,6 @@ const categories = [
   'Tieflader',
 ]
 
-const fallbackTrailers: Trailer[] = [
-  {
-    _id: 'demo-kasten',
-    title: 'Kastenanhänger 750 kg',
-    category: 'Kastenanhänger',
-    shortDescription: 'Der praktische Allrounder für Umzug, Garten und Alltag.',
-    description:
-      'Kompakter, ungebremster Anhänger für Transporte im Alltag. Ideal für Möbel, Baumarkt-Einkäufe, Grünschnitt und kleinere Umzüge.',
-    pricePerDay: '25 €',
-    weekendPrice: '59 €',
-    deposit: '100 €',
-    totalWeight: '750 kg',
-    payload: 'ca. 600 kg',
-    dimensions: '2,05 × 1,10 m',
-    braked: false,
-    licenseClass: 'B',
-    status: 'Verfügbar',
-    badge: 'Beliebt',
-  },
-  {
-    _id: 'demo-hochlader',
-    title: 'Hochlader 1.300 kg',
-    category: 'Hochlader',
-    shortDescription: 'Viel Ladefläche und von drei Seiten einfach zu beladen.',
-    description:
-      'Gebremster Hochlader mit klappbaren Bordwänden. Perfekt für Baustoffe, Maschinen, Paletten und größere Transportaufgaben.',
-    pricePerDay: '39 €',
-    weekendPrice: '89 €',
-    deposit: '150 €',
-    totalWeight: '1.300 kg',
-    payload: 'ca. 1.000 kg',
-    dimensions: '2,60 × 1,50 m',
-    braked: true,
-    licenseClass: 'B / B96 / BE*',
-    status: 'Verfügbar',
-    badge: 'Top Preis',
-  },
-  {
-    _id: 'demo-auto',
-    title: 'Autotransporter 2.700 kg',
-    category: 'Autotransporter',
-    shortDescription: 'Sicherer Fahrzeugtransport mit Auffahrrampen und Winde.',
-    description:
-      'Robuster Autotransporter für PKW und kleinere Fahrzeuge. Mit Auffahrrampen, Winde und zahlreichen Verzurrpunkten ausgestattet.',
-    pricePerDay: '69 €',
-    weekendPrice: '159 €',
-    deposit: '250 €',
-    totalWeight: '2.700 kg',
-    payload: 'ca. 2.000 kg',
-    dimensions: '4,00 × 2,00 m',
-    braked: true,
-    licenseClass: 'BE*',
-    status: 'Verfügbar',
-    badge: 'Profi',
-  },
-]
 
 function Icon({ name, className = 'h-5 w-5' }: { name: string; className?: string }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
@@ -137,6 +80,7 @@ export default function Page() {
   const [selectedImage, setSelectedImage] = useState('')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sanityError, setSanityError] = useState(false)
   const [mobileMenu, setMobileMenu] = useState(false)
   const [pickupDate, setPickupDate] = useState('')
   const [returnDate, setReturnDate] = useState('')
@@ -144,14 +88,25 @@ export default function Page() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [trailerData, postData] = await Promise.all([
-          client.fetch<Trailer[]>(trailersQuery),
-          client.fetch<Post[]>(postsQuery),
-        ])
-        setTrailers(trailerData?.length ? trailerData : fallbackTrailers)
-        setPosts(postData || [])
-      } catch {
-        setTrailers(fallbackTrailers)
+        const response = await fetch('/api/sanity-data', {
+          method: 'GET',
+          cache: 'no-store',
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Sanity-Daten konnten nicht geladen werden.')
+        }
+
+        setTrailers(data.trailers || [])
+        setPosts(data.posts || [])
+        setSanityError(false)
+      } catch (error) {
+        console.error('Sanity konnte nicht geladen werden:', error)
+        setTrailers([])
+        setPosts([])
+        setSanityError(true)
       } finally {
         setLoading(false)
       }
@@ -369,8 +324,13 @@ export default function Page() {
                 )
               })}
             </div>
+          ) : sanityError ? (
+            <div className="rounded-2xl border border-red-400/20 bg-red-400/[0.06] p-10 text-center">
+              <div className="font-semibold text-red-200">Sanity konnte nicht geladen werden.</div>
+              <div className="mt-2 text-sm text-zinc-500">Prüfe deine Sanity-Projektverbindung. Demo-Anhänger werden bewusst nicht mehr angezeigt.</div>
+            </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center text-zinc-400">Keine passenden Anhänger gefunden.</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center text-zinc-400">Noch keine Anhänger vorhanden oder keine passenden Anhänger gefunden.</div>
           )}
         </section>
 

@@ -1,53 +1,44 @@
-# Einmalige Einrichtung für Login und Buchungen
+# Supabase: Login, Registrierung und Buchungen einrichten
 
-Die Dateien in diesem Paket enthalten den vollständigen Code für Registrierung, Login, Mietanfrage und Kundenbereich. Damit Accounts und Buchungen dauerhaft gespeichert werden, braucht das Projekt ein Supabase-Projekt.
+## Wichtig bei "Failed to fetch"
 
-## 1. Supabase-Projekt erstellen
+Der Fehler entsteht fast immer, wenn die Website noch keine gültige Supabase-Verbindung hat. Die neue Version zeigt dafür jetzt eine verständliche Fehlermeldung statt nur "Failed to fetch".
 
-Auf supabase.com ein neues Projekt erstellen.
+## 1. Supabase-Projekt
 
-## 2. Datenbank einrichten
+Erstelle auf supabase.com ein Projekt und öffne im Dashboard **Project Settings -> API**.
 
-Im Supabase Dashboard den **SQL Editor** öffnen. Den kompletten Inhalt der Datei `supabase/schema.sql` einfügen und einmal ausführen.
+## 2. `.env.local` im Hauptordner ergänzen
 
-Das Skript erstellt automatisch:
-- Kundenprofile
-- Buchungstabelle
-- Sicherheitsregeln (RLS)
-- automatische Profilerstellung bei Registrierung
-- Buchungsfunktion mit Schutz gegen Doppelbuchungen
+Deine vorhandene `.env.local` NICHT löschen. Ergänze dort:
 
-## 3. Umgebungsvariablen ergänzen
+NEXT_PUBLIC_SUPABASE_URL=https://DEIN-PROJEKT.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=DEIN_PUBLISHABLE_KEY
 
-Die eigene bestehende `.env.local` NICHT löschen. Nur diese beiden Werte zusätzlich eintragen (Werte im Supabase Dashboard unter Project Settings / API):
+Falls dein Projekt noch den älteren Anon Key anzeigt, geht alternativ:
 
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=DEIN_ANON_KEY
 
-Eine Vorlage liegt als `.env.example` bei.
-
-## 4. Abhängigkeit installieren
-
-Nachdem die Dateien in das bestehende Projekt kopiert wurden, im VS-Code-Terminal einmal ausführen:
-
-npm install
-
-Danach:
+Danach den laufenden Dev-Server komplett beenden und neu starten:
 
 npm run dev
 
-## 5. E-Mail-Bestätigung
+Next.js liest Änderungen an den Umgebungsvariablen sonst unter Umständen nicht korrekt neu ein.
 
-Supabase aktiviert bei neuen Projekten normalerweise die E-Mail-Bestätigung. Nach einer Registrierung bestätigt der Kunde seine E-Mail und kann sich anschließend einloggen. Für lokale Tests kann diese Einstellung im Supabase-Dashboard unter Authentication geändert werden.
+## 3. Datenbank aktualisieren
 
-## Enthaltene Funktionen
+Öffne in Supabase den **SQL Editor** und führe den kompletten Inhalt von `supabase/schema.sql` aus.
 
-- `/registrieren` – Kundenkonto erstellen
-- `/login` – anmelden
-- `/mieten` – Anhänger + Zeitraum auswählen und Mietanfrage speichern
-- `/konto` – eigene Mieten sehen und offene Anfragen stornieren
-- Startseitenbuttons führen auf die echten Seiten
-- gewählte Start-/Enddaten werden zur Mietseite übernommen
-- gewählter Anhänger aus der Detailansicht wird zur Mietseite übernommen
-- Doppelbuchungen für denselben Anhänger und überschneidende Zeiträume werden serverseitig verhindert
-- noch keine Online-Zahlung
+Das Skript darf auch ausgeführt werden, wenn du die vorherige Version bereits eingerichtet hast. Es ergänzt die neue Spalte `pickup_time` und ersetzt die alte Buchungsfunktion.
+
+## 4. Abholzeiten ändern
+
+Die aktuell angebotenen Zeiten stehen in:
+
+app/mieten/page.tsx
+
+Dort findest du die `<option>`-Einträge von 08:00 bis 17:00 Uhr. Du kannst später einfach Zeiten entfernen oder weitere hinzufügen. Die vom Kunden gewählte Uhrzeit wird jetzt als eigenes Datenbankfeld gespeichert und im Kundenbereich angezeigt.
+
+## 5. Vercel
+
+Wenn du die Seite auf Vercel veröffentlichst, müssen dieselben Supabase-Variablen auch unter **Project Settings -> Environment Variables** in Vercel eingetragen werden. Danach erneut deployen.

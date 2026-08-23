@@ -11,7 +11,8 @@
   "dependencies": {
     "@sanity/image-url": "^2.0.3",
     "@sanity/vision": "^5.15.0",
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.3",
     "next": "16.1.6",
     "next-sanity": "^12.1.1",
     "react": "19.2.3",
