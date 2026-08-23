@@ -222,6 +222,7 @@ export default function Page() {
               ))}
             </div>
           </div>
+          </section>
 
           {soldVehicles.length > 0 && (
 <section className="mx-auto max-w-7xl px-6 py-16">
@@ -283,7 +284,7 @@ export default function Page() {
 )}
 
 
-        </section>
+        
 
 <section className="mx-auto max-w-7xl px-6 pb-16 pt-8">
   <div className="border-t border-b border-white/10 py-10">
