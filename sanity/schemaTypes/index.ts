@@ -1,4 +1,4 @@
-import {vehicleType} from './vehicleType'
 import {postType} from './postType'
+import {trailerType} from './trailerType'
 
-export const schemaTypes = [vehicleType, postType]
+export const schemaTypes = [trailerType, postType]
