@@ -5,9 +5,13 @@ export const dynamic = 'force-dynamic'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
 const resendApiKey = process.env.RESEND_API_KEY
 const emailFrom = process.env.EMAIL_FROM
 const emailReplyTo = process.env.EMAIL_REPLY_TO
+
+const pushoverUserKey = process.env.PUSHOVER_USER_KEY
+const pushoverAppToken = process.env.PUSHOVER_APP_TOKEN
 
 function escapeHtml(value: unknown) {
   return String(value ?? '')
@@ -31,13 +35,22 @@ function paymentLabel(method: string) {
   return method === 'online' ? 'Online-Zahlung' : 'Barzahlung'
 }
 
-function emailLayout(title: string, intro: string, rows: Array<[string, string]>, footer: string) {
+function emailLayout(
+  title: string,
+  intro: string,
+  rows: Array<[string, string]>,
+  footer: string,
+) {
   const tableRows = rows
     .map(
       ([label, value]) => `
         <tr>
-          <td style="padding:10px 0;color:#8b8b84;font-size:14px;vertical-align:top;width:42%">${escapeHtml(label)}</td>
-          <td style="padding:10px 0;color:#f4f4ef;font-size:14px;font-weight:600;vertical-align:top">${escapeHtml(value)}</td>
+          <td style="padding:10px 0;color:#8b8b84;font-size:14px;vertical-align:top;width:42%">
+            ${escapeHtml(label)}
+          </td>
+          <td style="padding:10px 0;color:#f4f4ef;font-size:14px;font-weight:600;vertical-align:top">
+            ${escapeHtml(value)}
+          </td>
         </tr>
       `,
     )
@@ -50,7 +63,7 @@ function emailLayout(title: string, intro: string, rows: Array<[string, string]>
         <div style="max-width:620px;margin:0 auto;padding:32px 18px">
           <div style="border:1px solid #2a2b26;background:#10110e;border-radius:24px;padding:28px">
             <div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#fbbf24;font-weight:700">
-              ESCO Anhängervermietung
+              Liwa Anhängervermietung
             </div>
             <h1 style="font-size:28px;line-height:1.2;margin:12px 0 10px;color:#ffffff">${escapeHtml(title)}</h1>
             <p style="font-size:15px;line-height:1.7;color:#aaa9a2;margin:0 0 20px">${escapeHtml(intro)}</p>
@@ -97,8 +110,42 @@ async function sendEmail(to: string | string[], subject: string, html: string) {
     const body = await response.text()
     throw new Error(`Resend Fehler ${response.status}: ${body}`)
   }
+}
 
-  return response.json()
+async function sendPushoverNotification(input: {
+  title: string
+  message: string
+  url?: string
+}) {
+  if (!pushoverUserKey || !pushoverAppToken) {
+    throw new Error('PUSHOVER_USER_KEY oder PUSHOVER_APP_TOKEN fehlt.')
+  }
+
+  const body = new URLSearchParams()
+  body.set('token', pushoverAppToken)
+  body.set('user', pushoverUserKey)
+  body.set('title', input.title)
+  body.set('message', input.message)
+  body.set('priority', '0')
+  body.set('sound', 'cashregister')
+
+  if (input.url) {
+    body.set('url', input.url)
+    body.set('url_title', 'Adminbereich öffnen')
+  }
+
+  const response = await fetch('https://api.pushover.net/1/messages.json', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Pushover Fehler ${response.status}: ${errorText}`)
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -107,13 +154,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Server-Konfiguration für Supabase fehlt.' },
         { status: 500 },
-      )
-    }
-
-    if (!resendApiKey || !emailFrom) {
-      return NextResponse.json(
-        { error: 'E-Mail-Versand ist noch nicht konfiguriert.' },
-        { status: 503 },
       )
     }
 
@@ -159,7 +199,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (booking.user_id !== authData.user.id) {
-      return NextResponse.json({ error: 'Kein Zugriff auf diese Buchung.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Kein Zugriff auf diese Buchung.' },
+        { status: 403 },
+      )
     }
 
     const [{ data: customer }, { data: admins }] = await Promise.all([
@@ -176,17 +219,10 @@ export async function POST(request: NextRequest) {
     ])
 
     const customerEmail = customer?.email || authData.user.email
-
-    if (!customerEmail) {
-      return NextResponse.json(
-        { error: 'Für den Kunden ist keine E-Mail-Adresse hinterlegt.' },
-        { status: 422 },
-      )
-    }
-
     const time = booking.pickup_time
       ? `${String(booking.pickup_time).slice(0, 5)} Uhr`
       : '—'
+    const bookingNumber = booking.id.slice(0, 8).toUpperCase()
 
     const bookingRows: Array<[string, string]> = [
       ['Anhänger', booking.trailer_title],
@@ -196,22 +232,39 @@ export async function POST(request: NextRequest) {
       ['Mietpreis', money(booking.total_price)],
       ['Zahlungsart', paymentLabel(booking.payment_method)],
       ['Status', 'Mietanfrage eingegangen'],
-      ['Buchungsnummer', booking.id.slice(0, 8).toUpperCase()],
+      ['Buchungsnummer', bookingNumber],
     ]
 
-    const customerHtml = emailLayout(
-      'Deine Mietanfrage ist eingegangen',
-      `Hallo ${customer?.full_name || 'und vielen Dank'}, wir haben deine Anfrage erhalten. Sie wird jetzt geprüft. Sobald sie bestätigt wurde, siehst du den aktuellen Status auch in deinem Kundenbereich.`,
-      bookingRows,
-      'Bitte antworte auf diese E-Mail, falls sich bei deinen Angaben etwas geändert hat.',
-    )
+    let customerEmailSent = false
+    let adminEmailSent = false
+    let pushSent = false
+    const errors: string[] = []
 
-    const customerResult = await sendEmail(
-      customerEmail,
-      `Mietanfrage ${booking.id.slice(0, 8).toUpperCase()} – ${booking.trailer_title}`,
-      customerHtml,
-    )
+    // Kunden-E-Mail
+    if (customerEmail) {
+      try {
+        const customerHtml = emailLayout(
+          'Deine Mietanfrage ist eingegangen',
+          `Hallo ${customer?.full_name || 'und vielen Dank'}, wir haben deine Anfrage erhalten. Sie wird jetzt geprüft. Sobald sie bestätigt wurde, siehst du den aktuellen Status auch in deinem Kundenbereich.`,
+          bookingRows,
+          'Bitte antworte auf diese E-Mail, falls sich bei deinen Angaben etwas geändert hat.',
+        )
 
+        await sendEmail(
+          customerEmail,
+          `Mietanfrage ${bookingNumber} – ${booking.trailer_title}`,
+          customerHtml,
+        )
+        customerEmailSent = true
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Kunden-E-Mail fehlgeschlagen'
+        errors.push(message)
+        console.error('Kunden-E-Mail:', error)
+      }
+    }
+
+    // Admin-E-Mail
     const adminEmails = Array.from(
       new Set(
         (admins || [])
@@ -220,43 +273,84 @@ export async function POST(request: NextRequest) {
       ),
     )
 
-    let adminResult: unknown = null
-
     if (adminEmails.length > 0) {
-      const adminRows: Array<[string, string]> = [
-        ['Kunde', customer?.full_name || '—'],
-        ['E-Mail', customerEmail],
-        ['Telefon', customer?.phone || '—'],
-        ...bookingRows,
-      ]
+      try {
+        const adminRows: Array<[string, string]> = [
+          ['Kunde', customer?.full_name || '—'],
+          ['E-Mail', customerEmail || '—'],
+          ['Telefon', customer?.phone || '—'],
+          ...bookingRows,
+        ]
 
-      const adminHtml = emailLayout(
-        'Neue Mietanfrage',
-        'Eine neue Buchungsanfrage ist eingegangen. Bitte prüfe sie im Adminbereich und bestätige oder lehne sie ab.',
-        adminRows,
-        'Diese Nachricht wurde automatisch versendet, weil dein Konto in der Datenbank als Administrator markiert ist.',
-      )
+        const adminHtml = emailLayout(
+          'Neue Mietanfrage',
+          'Eine neue Buchungsanfrage ist eingegangen. Bitte prüfe sie im Adminbereich und bestätige oder lehne sie ab.',
+          adminRows,
+          'Diese Nachricht wurde automatisch versendet, weil dein Konto in der Datenbank als Administrator markiert ist.',
+        )
 
-      adminResult = await sendEmail(
-        adminEmails,
-        `Neue Mietanfrage – ${booking.trailer_title} – ${dateDE(booking.start_date)}`,
-        adminHtml,
-      )
+        await sendEmail(
+          adminEmails,
+          `Neue Mietanfrage – ${booking.trailer_title} – ${dateDE(booking.start_date)}`,
+          adminHtml,
+        )
+        adminEmailSent = true
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Admin-E-Mail fehlgeschlagen'
+        errors.push(message)
+        console.error('Admin-E-Mail:', error)
+      }
+    }
+
+    // Push-Benachrichtigung
+    try {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
+      const adminUrl = process.env.ADMIN_URL || (siteUrl ? `${siteUrl}/admin` : undefined)
+
+      const pushMessage = [
+        `Kunde: ${customer?.full_name || '—'}`,
+        `Telefon: ${customer?.phone || '—'}`,
+        `Anhänger: ${booking.trailer_title}`,
+        `Abholung: ${dateDE(booking.start_date)} · ${time}`,
+        `Rückgabe: ${dateDE(booking.end_date)} · ${time}`,
+        `Mietdauer: ${booking.days} Tag${booking.days === 1 ? '' : 'e'}`,
+        `Preis: ${money(booking.total_price)}`,
+        `Zahlungsart: ${paymentLabel(booking.payment_method)}`,
+        `Buchung: ${bookingNumber}`,
+      ].join('\n')
+
+      await sendPushoverNotification({
+        title: '🔔 Neue Mietanfrage',
+        message: pushMessage,
+        url: adminUrl,
+      })
+
+      pushSent = true
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Push-Benachrichtigung fehlgeschlagen'
+      errors.push(message)
+      console.error('Pushover:', error)
     }
 
     return NextResponse.json({
       ok: true,
-      customerEmailSent: true,
-      adminEmailSent: adminEmails.length > 0,
-      customerResult,
-      adminResult,
+      emailSent: customerEmailSent && adminEmailSent,
+      customerEmailSent,
+      adminEmailSent,
+      pushSent,
+      errors,
     })
   } catch (error) {
     console.error('booking-email route:', error)
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'E-Mail-Versand fehlgeschlagen.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Buchungs-Benachrichtigung fehlgeschlagen.',
       },
       { status: 500 },
     )

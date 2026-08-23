@@ -72,6 +72,46 @@ function Icon({ name, className = 'h-5 w-5' }: { name: string; className?: strin
   return <svg viewBox="0 0 24 24" className={className} aria-hidden="true">{paths[name]}</svg>
 }
 
+
+type HomeCalendarDay = {
+  date: string
+  day: number
+  inCurrentMonth: boolean
+}
+
+function homeIsoDate(date: Date) {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function homeMonthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function homeCalendarDays(month: Date): HomeCalendarDay[] {
+  const first = homeMonthStart(month)
+  const mondayIndex = (first.getDay() + 6) % 7
+  const gridStart = new Date(first)
+  gridStart.setDate(first.getDate() - mondayIndex)
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const current = new Date(gridStart)
+    current.setDate(gridStart.getDate() + index)
+    return {
+      date: homeIsoDate(current),
+      day: current.getDate(),
+      inCurrentMonth: current.getMonth() === month.getMonth(),
+    }
+  })
+}
+
+function homeFormatDate(value: string) {
+  if (!value) return 'Datum auswählen'
+  return new Date(`${value}T12:00:00`).toLocaleDateString('de-DE')
+}
+
 export default function Page() {
   const [trailers, setTrailers] = useState<Trailer[]>([])
   const [posts, setPosts] = useState<Post[]>([])
@@ -84,6 +124,24 @@ export default function Page() {
   const [mobileMenu, setMobileMenu] = useState(false)
   const [pickupDate, setPickupDate] = useState('')
   const [returnDate, setReturnDate] = useState('')
+  const [homeCalendarOpen, setHomeCalendarOpen] = useState(false)
+  const [homeCalendarMonth, setHomeCalendarMonth] = useState(() => homeMonthStart(new Date()))
+  const homeToday = homeIsoDate(new Date())
+  const homeDays = useMemo(() => homeCalendarDays(homeCalendarMonth), [homeCalendarMonth])
+
+  function selectHomeDate(date: string) {
+    if (date < homeToday) return
+
+    if (!pickupDate || (pickupDate && returnDate) || date < pickupDate) {
+      setPickupDate(date)
+      setReturnDate('')
+      return
+    }
+
+    setReturnDate(date)
+    setHomeCalendarOpen(false)
+  }
+
 
   useEffect(() => {
     async function loadData() {
@@ -151,7 +209,7 @@ export default function Page() {
               <Icon name="truck" className="h-6 w-6" />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-400">ESCO</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-400">LIWA</div>
               <div className="text-sm font-semibold tracking-wide text-white sm:text-base">Anhängervermietung</div>
             </div>
           </a>
@@ -225,16 +283,29 @@ export default function Page() {
                   <div className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-amber-300 sm:flex"><Icon name="calendar" /></div>
                 </div>
 
-                <div className="mt-7 grid gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-medium uppercase tracking-[.2em] text-zinc-500">Abholung</span>
-                    <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3.5 text-sm text-white outline-none focus:border-amber-400/40 [color-scheme:dark]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-medium uppercase tracking-[.2em] text-zinc-500">Rückgabe</span>
-                    <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3.5 text-sm text-white outline-none focus:border-amber-400/40 [color-scheme:dark]" />
-                  </label>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pickupDate) {
+                      const d = new Date(`${pickupDate}T12:00:00`)
+                      if (!Number.isNaN(d.getTime())) setHomeCalendarMonth(homeMonthStart(d))
+                    }
+                    setHomeCalendarOpen(true)
+                  }}
+                  className="mt-7 w-full rounded-2xl border border-white/10 bg-black/20 p-4 text-left transition hover:border-amber-400/40"
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <div className="text-xs font-medium uppercase tracking-[.2em] text-zinc-500">Abholung</div>
+                      <div className="mt-1 font-medium text-zinc-200">{homeFormatDate(pickupDate)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium uppercase tracking-[.2em] text-zinc-500">Rückgabe</div>
+                      <div className="mt-1 font-medium text-zinc-200">{homeFormatDate(returnDate)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs text-amber-300">Kalender öffnen · Grün verfügbar</div>
+                </button>
 
                 <Link href={`/mieten?from=${encodeURIComponent(pickupDate)}&to=${encodeURIComponent(returnDate)}`} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 font-semibold text-black transition hover:bg-amber-300">
                   Verfügbarkeit prüfen <Icon name="arrow" />
@@ -358,7 +429,7 @@ export default function Page() {
 
         <section id="vorteile" className="mx-auto grid max-w-7xl scroll-mt-24 gap-10 px-5 py-20 md:px-6 md:py-28 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-400">Warum ESCO?</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-400">Warum LIWA?</div>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">Vermietung ohne unnötigen Aufwand.</h2>
             <p className="mt-5 max-w-xl leading-8 text-zinc-400">Klare Preise, gepflegte Anhänger und ein unkomplizierter Ablauf. Du weißt vorher, was du bekommst und was es kostet.</p>
             <button onClick={scrollToFleet} className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-black transition hover:bg-zinc-200">Anhänger ansehen <Icon name="arrow" /></button>
@@ -442,15 +513,141 @@ export default function Page() {
         <div className="mx-auto max-w-7xl px-5 py-10 md:px-6">
           <div className="grid gap-8 md:grid-cols-3">
             <div>
-              <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400"><Icon name="truck" /></div><div><div className="text-[10px] uppercase tracking-[.3em] text-amber-400">ESCO</div><div className="font-semibold">Anhängervermietung</div></div></div>
+              <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400"><Icon name="truck" /></div><div><div className="text-[10px] uppercase tracking-[.3em] text-amber-400">LIWA</div><div className="font-semibold">Anhängervermietung</div></div></div>
               <p className="mt-4 max-w-sm text-sm leading-6 text-zinc-500">Einfach den passenden Anhänger finden, Zeitraum wählen und unkompliziert mieten.</p>
             </div>
             <div className="text-sm"><div className="font-semibold text-zinc-200">Navigation</div><div className="mt-4 grid gap-2 text-zinc-500"><a href="#anhaenger" className="hover:text-white">Anhänger</a><a href="#ablauf" className="hover:text-white">Ablauf</a><a href="#faq" className="hover:text-white">FAQ</a><a href="#kontakt" className="hover:text-white">Kontakt</a></div></div>
             <div className="text-sm"><div className="font-semibold text-zinc-200">Rechtliches</div><div className="mt-4 grid gap-2 text-zinc-500"><span>Impressum</span><span>Datenschutz</span><span>AGB / Mietbedingungen</span><a href="/studio" className="mt-2 text-zinc-700 hover:text-zinc-400">Admin</a></div></div>
           </div>
-          <div className="mt-10 border-t border-white/10 pt-6 text-xs text-zinc-600">© {new Date().getFullYear()} ESCO Anhängervermietung. Alle Rechte vorbehalten.</div>
+          <div className="mt-10 border-t border-white/10 pt-6 text-xs text-zinc-600">© {new Date().getFullYear()} LIWA Anhängervermietung. Alle Rechte vorbehalten.</div>
         </div>
       </footer>
+
+      {homeCalendarOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setHomeCalendarOpen(false)
+          }}
+        >
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-[#11120f] p-5 shadow-2xl shadow-black/60 md:p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-400">
+                  Mietzeitraum
+                </div>
+                <h3 className="mt-2 text-xl font-semibold">Datum auswählen</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHomeCalendarOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-zinc-400 transition hover:bg-white/5 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHomeCalendarMonth(
+                      new Date(homeCalendarMonth.getFullYear(), homeCalendarMonth.getMonth() - 1, 1),
+                    )
+                  }
+                  className="h-10 w-10 rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5"
+                >
+                  ←
+                </button>
+                <div className="font-semibold capitalize">
+                  {homeCalendarMonth.toLocaleDateString('de-DE', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHomeCalendarMonth(
+                      new Date(homeCalendarMonth.getFullYear(), homeCalendarMonth.getMonth() + 1, 1),
+                    )
+                  }
+                  className="h-10 w-10 rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5"
+                >
+                  →
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-zinc-600">
+                {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
+                  <div key={day} className="py-2">{day}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {homeDays.map((item) => {
+                  const past = item.date < homeToday
+                  const selected =
+                    item.date === pickupDate ||
+                    item.date === returnDate ||
+                    (pickupDate && returnDate && item.date > pickupDate && item.date < returnDate)
+
+                  return (
+                    <button
+                      key={item.date}
+                      type="button"
+                      disabled={past}
+                      onClick={() => selectHomeDate(item.date)}
+                      className={`aspect-square rounded-xl text-sm transition ${
+                        past
+                          ? 'cursor-not-allowed text-zinc-800'
+                          : selected
+                            ? 'border border-amber-300 bg-amber-400 text-black font-semibold'
+                            : item.inCurrentMonth
+                              ? 'border border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/20'
+                              : 'text-zinc-700 hover:bg-white/5'
+                      }`}
+                    >
+                      {item.day}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs">
+                <div className="flex items-center gap-2 text-zinc-500">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                  Verfügbarer Zeitraum
+                </div>
+                {(pickupDate || returnDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPickupDate('')
+                      setReturnDate('')
+                    }}
+                    className="text-zinc-400 hover:text-white"
+                  >
+                    Auswahl löschen
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-zinc-600">Abholung</div>
+                  <div className="mt-1 text-sm font-medium">{homeFormatDate(pickupDate)}</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-zinc-600">Rückgabe</div>
+                  <div className="mt-1 text-sm font-medium">{homeFormatDate(returnDate)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedTrailer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-3 py-4 backdrop-blur-md md:px-6">
@@ -494,8 +691,7 @@ export default function Page() {
 
                 <div className="mt-6 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] p-5">
                   <div className="flex items-end justify-between gap-3"><div><div className="text-xs text-zinc-500">Mietpreis ab</div><div className="mt-1 text-3xl font-semibold">{selectedTrailer.pricePerDay || 'Auf Anfrage'} <span className="text-sm font-normal text-zinc-500">/ Tag</span></div></div><div className="text-right text-xs text-zinc-500">Kaution<br/><span className="text-sm text-zinc-300">{selectedTrailer.deposit || '—'}</span></div></div>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2"><input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} className="rounded-xl border border-white/10 bg-black/25 px-3 py-3 text-sm [color-scheme:dark]"/><input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="rounded-xl border border-white/10 bg-black/25 px-3 py-3 text-sm [color-scheme:dark]"/></div>
-                  <Link href={`/mieten?trailer=${encodeURIComponent(selectedTrailer._id)}&from=${encodeURIComponent(pickupDate)}&to=${encodeURIComponent(returnDate)}`} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Diesen Anhänger mieten <Icon name="arrow" /></Link>
+                  <Link href={`/mieten?trailer=${encodeURIComponent(selectedTrailer._id)}`} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Diesen Anhänger mieten <Icon name="arrow" /></Link>
                 </div>
                 <p className="mt-4 text-[11px] leading-5 text-zinc-600">* Die tatsächlich benötigte Führerscheinklasse hängt vom Zugfahrzeug und der zulässigen Gesamtmasse des Gespanns ab.</p>
               </div>

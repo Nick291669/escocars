@@ -2,7 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'ESCO Anhängervermietung | Anhänger einfach mieten',
+  title: 'LIWA Anhängervermietung | Anhänger einfach mieten',
   description: 'Anhänger für Umzug, Baustelle und Fahrzeugtransport einfach und flexibel mieten.',
 }
 

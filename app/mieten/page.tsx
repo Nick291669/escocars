@@ -137,6 +137,7 @@ export default function RentPage() {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [pickupTimeOpen, setPickupTimeOpen] = useState(false)
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'failed'>('idle')
+  const [pushStatus, setPushStatus] = useState<'idle' | 'sent' | 'failed'>('idle')
   const [calendarMonth, setCalendarMonth] = useState(() => monthStart(new Date()))
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set())
   const [calendarLoading, setCalendarLoading] = useState(false)
@@ -329,6 +330,7 @@ export default function RentPage() {
     setError('')
     setSuccessId('')
     setEmailStatus('idle')
+    setPushStatus('idle')
 
     if (!trailer) return setError('Bitte wähle einen verfügbaren Anhänger aus.')
     if (!startDate || !endDate || days < 1)
@@ -399,16 +401,21 @@ export default function RentPage() {
             body: JSON.stringify({ bookingId }),
           })
 
-          setEmailStatus(mailResponse.ok ? 'sent' : 'failed')
+          const notificationResult = await mailResponse.json().catch(() => null)
 
-          if (!mailResponse.ok) {
-            const mailError = await mailResponse.json().catch(() => null)
-            console.error('Buchungs-E-Mail:', mailError)
+          if (mailResponse.ok) {
+            setEmailStatus(notificationResult?.emailSent ? 'sent' : 'failed')
+            setPushStatus(notificationResult?.pushSent ? 'sent' : 'failed')
+          } else {
+            setEmailStatus('failed')
+            setPushStatus('failed')
+            console.error('Buchungs-Benachrichtigung:', notificationResult)
           }
         }
-      } catch (mailError) {
-        console.error('Buchungs-E-Mail:', mailError)
+      } catch (notificationError) {
+        console.error('Buchungs-Benachrichtigung:', notificationError)
         setEmailStatus('failed')
+        setPushStatus('failed')
       }
     } catch (bookingError) {
       setError(
@@ -976,7 +983,7 @@ export default function RentPage() {
                   </div>
                   {emailStatus === 'sent' && (
                     <div className="mt-3 rounded-lg bg-emerald-300/10 px-3 py-2 text-xs text-emerald-100">
-                      Eine Bestätigungs-E-Mail wurde an dich und den Administrator versendet.
+                      Eine Bestätigung wurde an dich gesendet.
                     </div>
                   )}
                   {emailStatus === 'failed' && (

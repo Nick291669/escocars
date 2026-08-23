@@ -99,13 +99,35 @@ export default function AdminPage() {
     if (!window.confirm('Status dieser Buchung wirklich ändern?')) return
     setBusyId(id)
     setError('')
-    const { error: rpcError } = await supabase.rpc('admin_set_booking_status', {
-      p_booking_id: id,
-      p_status: status,
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+
+    if (!accessToken) {
+      setBusyId('')
+      setError('Deine Sitzung ist abgelaufen. Bitte logge dich erneut ein.')
+      return
+    }
+
+    const response = await fetch('/api/admin-booking-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ bookingId: id, status }),
     })
+
+    const result = await response.json().catch(() => null)
     setBusyId('')
-    if (rpcError) return setError(rpcError.message)
-    setBookings((items) => items.map((b) => b.id === id ? { ...b, status } : b))
+
+    if (!response.ok) {
+      setError(result?.error || 'Der Buchungsstatus konnte nicht geändert werden.')
+      return
+    }
+
+    setBookings((items) =>
+      items.map((item) => item.id === id ? { ...item, status } : item),
+    )
   }
 
   if (loading) {
@@ -142,6 +164,7 @@ export default function AdminPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="text-sm text-zinc-400 hover:text-white">← Website</Link>
           <div className="flex gap-2">
+            <Link href="/admin/buchhaltung" className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-black">Buchhaltung</Link>
             <Link href="/studio" className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300">Sanity Studio</Link>
             <button onClick={load} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300">Aktualisieren</button>
           </div>

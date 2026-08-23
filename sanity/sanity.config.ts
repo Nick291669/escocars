@@ -5,7 +5,7 @@ import {schemaTypes} from './schemaTypes'
 
 export default defineConfig({
   name: 'default',
-  title: 'ESCO Anhängervermietung CMS',
+  title: 'LIWA Anhängervermietung CMS',
   projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || '6lv81j4f',
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
   basePath: '/studio',
