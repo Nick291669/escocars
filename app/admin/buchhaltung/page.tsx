@@ -36,6 +36,8 @@ type Booking = {
   total_price: number | null
   status: string
   user_id: string
+  payment_method?: string
+  payment_status?: string | null
 }
 
 type Profile = {
@@ -96,7 +98,9 @@ export default function BuchhaltungPage() {
   const [profiles, setProfiles] = useState<Record<string, Profile>>({})
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [cancelledBookings, setCancelledBookings] = useState<Booking[]>([])
-  const [formOpen, setFormOpen] = useState(false)
+  const [trashEntries, setTrashEntries] = useState<LedgerEntry[]>([])
+  const [trashBookings, setTrashBookings] = useState<Booking[]>([])
+  const [entryModal, setEntryModal] = useState<EntryType | null>(null)
   const [depositOpen, setDepositOpen] = useState(false)
   const [entryType, setEntryType] = useState<EntryType>('business_expense')
   const [entryDate, setEntryDate] = useState(todayISO())
@@ -107,6 +111,42 @@ export default function BuchhaltungPage() {
   const [selectedBooking, setSelectedBooking] = useState('')
   const [depositAmount, setDepositAmount] = useState('')
   const [depositNote, setDepositNote] = useState('')
+
+  function openEntryModal(type: EntryType) {
+    setEntryType(type)
+    setEntryDate(todayISO())
+    setAmount('')
+    setDescription('')
+    setCounterparty('')
+    setReference('')
+    setEntryModal(type)
+    setError('')
+    setNotice('')
+  }
+
+  function closeEntryModal() {
+    setEntryModal(null)
+    setAmount('')
+    setDescription('')
+    setCounterparty('')
+    setReference('')
+  }
+
+  const entryModalTitle: Record<EntryType, string> = {
+    rental_income: 'Mieteinnahme',
+    business_expense: 'Betriebsausgabe erfassen',
+    bank_deposit: 'Bankeinzahlung erfassen',
+    private_withdrawal: 'Privatentnahme erfassen',
+    private_contribution: 'Privateinlage erfassen',
+    correction: 'Korrektur',
+  }
+
+  const entryModalHelp: Partial<Record<EntryType, string>> = {
+    business_expense: 'Erfasse betriebliche Kosten wie Reparatur, TÜV, Versicherung, Ersatzteile oder Büromaterial.',
+    bank_deposit: 'Erfasse Bargeld, das du aus der Geschäftskasse auf dein Geschäftskonto einzahlst. Das ist kein neuer Umsatz.',
+    private_withdrawal: 'Erfasse Geld, das du aus der Geschäftskasse für private Zwecke entnimmst.',
+    private_contribution: 'Erfasse privates Geld, das du in die Geschäftskasse einlegst.',
+  }
 
   async function load() {
     setLoading(true)
@@ -129,29 +169,37 @@ export default function BuchhaltungPage() {
     const from = `${year}-01-01`
     const to = `${year}-12-31`
 
-    const [entryResult, bookingResult, profileResult, depositResult, cancelledResult] = await Promise.all([
+    const [entryResult, bookingResult, profileResult, depositResult, trashEntryResult, trashBookingResult] = await Promise.all([
       supabase
         .from('accounting_entries')
         .select('id,receipt_number,booking_id,entry_date,entry_type,amount,description,counterparty,payment_method,reference,correction_of,created_at')
+        .is('deleted_at', null)
         .gte('entry_date', from)
         .lte('entry_date', to)
         .order('entry_date', { ascending: false })
         .order('created_at', { ascending: false }),
       supabase
         .from('bookings')
-        .select('id,trailer_title,start_date,end_date,pickup_time,total_price,status,user_id')
+        .select('id,trailer_title,start_date,end_date,pickup_time,total_price,status,user_id,payment_method,payment_status')
+        .is('deleted_at', null)
         .in('status', ['confirmed', 'completed'])
         .order('start_date', { ascending: false }),
       supabase.from('profiles').select('id,full_name,email'),
       supabase
         .from('security_deposits')
         .select('id,booking_id,amount,received_at,returned_at,status,note')
+        .is('deleted_at', null)
         .order('received_at', { ascending: false }),
       supabase
+        .from('accounting_entries')
+        .select('id,receipt_number,booking_id,entry_date,entry_type,amount,description,counterparty,payment_method,reference,correction_of,created_at')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false }),
+      supabase
         .from('bookings')
-        .select('id,trailer_title,start_date,end_date,pickup_time,total_price,status,user_id')
-        .eq('status', 'cancelled')
-        .order('start_date', { ascending: false }),
+        .select('id,trailer_title,start_date,end_date,pickup_time,total_price,status,user_id,payment_method,payment_status')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false }),
     ])
 
     if (entryResult.error) setError(entryResult.error.message)
@@ -170,8 +218,11 @@ export default function BuchhaltungPage() {
     if (depositResult.error) setError((old) => old || depositResult.error.message)
     else setDeposits((depositResult.data || []) as Deposit[])
 
-    if (cancelledResult.error) setError((old) => old || cancelledResult.error.message)
-    else setCancelledBookings((cancelledResult.data || []) as Booking[])
+    if (trashEntryResult.error) setError((old) => old || trashEntryResult.error.message)
+    else setTrashEntries((trashEntryResult.data || []) as LedgerEntry[])
+
+    if (trashBookingResult.error) setError((old) => old || trashBookingResult.error.message)
+    else setTrashBookings((trashBookingResult.data || []) as Booking[])
 
     setLoading(false)
   }
@@ -254,7 +305,7 @@ export default function BuchhaltungPage() {
       return
     }
 
-    setFormOpen(false)
+    closeEntryModal()
     setAmount('')
     setDescription('')
     setCounterparty('')
@@ -286,6 +337,34 @@ export default function BuchhaltungPage() {
     setNotice(`Barzahlung von ${renter?.full_name || 'Kunde'} wurde verbucht.`)
     await load()
   }
+
+  async function markBookingOnlinePaid(booking: Booking) {
+    if (booking.total_price == null) {
+      setError('Für diese Buchung ist kein fester Mietpreis hinterlegt.')
+      return
+    }
+
+    if (!window.confirm(`${money(Number(booking.total_price))} als erhaltene Onlinezahlung verbuchen?`)) return
+
+    setBusy(true)
+    setError('')
+    setNotice('')
+
+    const { error: rpcError } = await supabase.rpc('admin_record_online_rental_payment', {
+      p_booking_id: booking.id,
+    })
+
+    setBusy(false)
+
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+
+    setNotice('Onlinezahlung wurde verbucht.')
+    await load()
+  }
+
 
   async function createDeposit(event: FormEvent) {
     event.preventDefault()
@@ -348,9 +427,12 @@ export default function BuchhaltungPage() {
     await load()
   }
 
-  async function deleteTestEntry(entry: LedgerEntry) {
+
+
+  async function moveBookingToTrash(booking: Booking, reason = 'Storniert') {
+    const renter = profiles[booking.user_id]?.full_name || 'Kunde'
     const ok = window.confirm(
-      `TESTDATEN ENDGÜLTIG LÖSCHEN?\n\n${entry.receipt_number}\n${entry.description}\n${money(Number(entry.amount))}\n\nFür echte Buchhaltungsdaten später bitte immer „Korrigieren“ verwenden.`
+      `${reason.toUpperCase()}?\n\n${booking.trailer_title}\n${renter}\n${dateDE(booking.start_date)}\n${booking.id.slice(0,8).toUpperCase()}\n\nDie Anfrage wird in den Papierkorb verschoben und kann dort wiederhergestellt werden.`
     )
     if (!ok) return
 
@@ -358,44 +440,80 @@ export default function BuchhaltungPage() {
     setError('')
     setNotice('')
 
-    const { error: rpcError } = await supabase.rpc('admin_delete_accounting_test_entry', {
+    const { error: rpcError } = await supabase.rpc('admin_move_booking_to_trash', {
+      p_booking_id: booking.id,
+      p_reason: reason,
+    })
+
+    setBusy(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+
+    setNotice('Anfrage wurde in den Papierkorb verschoben.')
+    await load()
+  }
+
+  async function moveLedgerEntryToTrash(entry: LedgerEntry) {
+    const ok = window.confirm(
+      `IN DEN PAPIERKORB VERSCHIEBEN?\n\n${entry.receipt_number}\n${entry.description}\n${money(Number(entry.amount))}`
+    )
+    if (!ok) return
+
+    setBusy(true)
+    setError('')
+    setNotice('')
+
+    const { error: rpcError } = await supabase.rpc('admin_move_accounting_entry_to_trash', {
       p_entry_id: entry.id,
     })
 
     setBusy(false)
-
     if (rpcError) {
       setError(rpcError.message)
       return
     }
 
-    setNotice('Test-Kassenbucheintrag wurde endgültig gelöscht.')
+    setNotice('Kassenbucheintrag wurde in den Papierkorb verschoben.')
     await load()
   }
 
-  async function deleteCancelledTestBooking(booking: Booking) {
-    const renter = profiles[booking.user_id]?.full_name || 'Kunde'
-    const ok = window.confirm(
-      `STORNIERTE TESTBUCHUNG ENDGÜLTIG LÖSCHEN?\n\n${booking.trailer_title}\n${renter}\n${dateDE(booking.start_date)}\n${booking.id.slice(0,8).toUpperCase()}\n\nZugehörige Test-Kassenbucheinträge und Kautionen werden ebenfalls gelöscht.`
-    )
-    if (!ok) return
-
+  async function restoreTrashBooking(booking: Booking) {
     setBusy(true)
     setError('')
     setNotice('')
 
-    const { error: rpcError } = await supabase.rpc('admin_delete_cancelled_test_booking', {
+    const { error: rpcError } = await supabase.rpc('admin_restore_booking_from_trash', {
       p_booking_id: booking.id,
     })
 
     setBusy(false)
-
     if (rpcError) {
       setError(rpcError.message)
       return
     }
 
-    setNotice('Stornierte Testbuchung wurde endgültig gelöscht.')
+    setNotice('Anfrage wurde wiederhergestellt und steht wieder bei den offenen Zahlungen.')
+    await load()
+  }
+
+  async function restoreTrashEntry(entry: LedgerEntry) {
+    setBusy(true)
+    setError('')
+    setNotice('')
+
+    const { error: rpcError } = await supabase.rpc('admin_restore_accounting_entry_from_trash', {
+      p_entry_id: entry.id,
+    })
+
+    setBusy(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+
+    setNotice('Kassenbucheintrag wurde wiederhergestellt.')
     await load()
   }
 
@@ -463,6 +581,137 @@ export default function BuchhaltungPage() {
         </div>
       )}
 
+      {entryModal && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeEntryModal()
+          }}
+        >
+          <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#10110e] p-5 shadow-2xl md:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">
+                  LIWA Buchhaltung
+                </div>
+                <h3 className="mt-2 text-2xl font-semibold">{entryModalTitle[entryModal]}</h3>
+                <p className="mt-2 max-w-md text-sm leading-6 text-zinc-500">
+                  {entryModalHelp[entryModal] || 'Buchung erfassen.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEntryModal}
+                className="rounded-xl border border-white/10 px-3 py-2 text-zinc-400 transition hover:bg-white/5 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={addEntry} className="mt-6 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm text-zinc-400">
+                Datum
+                <input
+                  type="date"
+                  value={entryDate}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none focus:border-amber-400/50"
+                />
+              </label>
+
+              <label className="text-sm text-zinc-400">
+                Betrag €
+                <input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0,00"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none focus:border-amber-400/50"
+                />
+              </label>
+
+              <label className="text-sm text-zinc-400 sm:col-span-2">
+                Beschreibung
+                <input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={
+                    entryModal === 'business_expense'
+                      ? 'z. B. TÜV Motorradanhänger'
+                      : entryModal === 'bank_deposit'
+                        ? 'z. B. Bareinnahmen zur Bank gebracht'
+                        : entryModal === 'private_withdrawal'
+                          ? 'z. B. Privatentnahme'
+                          : 'z. B. Privateinlage'
+                  }
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none focus:border-amber-400/50"
+                />
+              </label>
+
+              <label className="text-sm text-zinc-400">
+                {entryModal === 'business_expense' ? 'Empfänger / Anbieter' : 'Gegenkonto / Person'}
+                <input
+                  value={counterparty}
+                  onChange={(e) => setCounterparty(e.target.value)}
+                  placeholder={
+                    entryModal === 'business_expense'
+                      ? 'z. B. DEKRA, Versicherung'
+                      : entryModal === 'bank_deposit'
+                        ? 'z. B. Geschäftskonto'
+                        : 'optional'
+                  }
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none focus:border-amber-400/50"
+                />
+              </label>
+
+              <label className="text-sm text-zinc-400">
+                Beleg / Referenz
+                <input
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="optional"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none focus:border-amber-400/50"
+                />
+              </label>
+
+              {entryModal === 'business_expense' && (
+                <div className="sm:col-span-2 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm leading-6 text-amber-100">
+                  Originalrechnung oder Quittung bitte zusätzlich aufbewahren. Die Referenz kannst du hier direkt mit erfassen.
+                </div>
+              )}
+
+              {entryModal === 'private_withdrawal' && (
+                <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-zinc-400">
+                  Eine Privatentnahme reduziert deinen Kassenbestand, wird aber nicht als Betriebsausgabe behandelt.
+                </div>
+              )}
+
+              {entryModal === 'bank_deposit' && (
+                <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-zinc-400">
+                  Die Einzahlung verschiebt Geld von Kasse zu Bank und erzeugt keinen zusätzlichen Umsatz.
+                </div>
+              )}
+
+              <div className="sm:col-span-2 flex flex-wrap justify-end gap-2 border-t border-white/10 pt-5">
+                <button
+                  type="button"
+                  onClick={closeEntryModal}
+                  className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-400 hover:bg-white/5"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-semibold text-black hover:bg-amber-300"
+                >
+                  Eintrag speichern
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-2">
@@ -483,7 +732,7 @@ export default function BuchhaltungPage() {
           <h1 className="mt-3 text-4xl font-semibold">Buchhaltung & Kasse</h1>
           <p className="mt-3 max-w-3xl text-zinc-500">
             Bareinnahmen, Ausgaben, Bankeinzahlungen, Privatbewegungen und Kautionen getrennt erfassen.
-            Im späteren Echtbetrieb werden Fehler über Korrekturbuchungen berichtigt. Während der Testphase kannst du Testdaten zusätzlich endgültig löschen.
+            Fehlbuchungen kannst du in den Papierkorb verschieben und bei Bedarf wiederherstellen.
           </p>
         </div>
 
@@ -509,13 +758,59 @@ export default function BuchhaltungPage() {
           ))}
         </section>
 
+        <section className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.03] p-5 md:p-7">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[.2em] text-amber-400">Schnellerfassung</div>
+            <h2 className="mt-2 text-2xl font-semibold">Kassenbewegung erfassen</h2>
+            <p className="mt-2 text-sm text-zinc-500">Wähle einfach aus, was passiert ist. Danach öffnet sich das passende Formular.</p>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => openEntryModal('business_expense')}
+              className="rounded-2xl border border-red-400/15 bg-red-400/[0.05] p-4 text-left transition hover:border-red-300/30 hover:bg-red-400/[0.08]"
+            >
+              <div className="text-lg font-semibold">Ausgabe erfassen</div>
+              <div className="mt-1 text-sm leading-5 text-zinc-500">Reparatur, TÜV, Versicherung, Material …</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openEntryModal('private_withdrawal')}
+              className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] p-4 text-left transition hover:border-amber-300/30 hover:bg-amber-400/[0.08]"
+            >
+              <div className="text-lg font-semibold">Geld privat entnehmen</div>
+              <div className="mt-1 text-sm leading-5 text-zinc-500">Privatentnahme aus der Geschäftskasse.</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openEntryModal('private_contribution')}
+              className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] p-4 text-left transition hover:border-emerald-300/30 hover:bg-emerald-400/[0.08]"
+            >
+              <div className="text-lg font-semibold">Privateinlage</div>
+              <div className="mt-1 text-sm leading-5 text-zinc-500">Privates Bargeld in die Geschäftskasse legen.</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openEntryModal('bank_deposit')}
+              className="rounded-2xl border border-sky-400/15 bg-sky-400/[0.05] p-4 text-left transition hover:border-sky-300/30 hover:bg-sky-400/[0.08]"
+            >
+              <div className="text-lg font-semibold">Bankeinzahlung</div>
+              <div className="mt-1 text-sm leading-5 text-zinc-500">Bargeld aus der Kasse aufs Geschäftskonto.</div>
+            </button>
+          </div>
+        </section>
+
         <section className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.03] p-5 md:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[.2em] text-amber-400">Offene Barzahlungen</div>
+              <div className="text-xs font-semibold uppercase tracking-[.2em] text-amber-400">Offene Zahlungen</div>
               <h2 className="mt-2 text-2xl font-semibold">Bestätigte Vermietungen</h2>
             </div>
-            <div className="text-sm text-zinc-500">{unpaidBookings.length} noch nicht als bezahlt verbucht</div>
+            <div className="text-sm text-zinc-500">{unpaidBookings.length} noch offen</div>
           </div>
           <div className="mt-5 grid gap-3">
             {unpaidBookings.length === 0 && <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-600">Keine offenen Barzahlungen.</div>}
@@ -529,7 +824,11 @@ export default function BuchhaltungPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="font-semibold">{b.total_price == null ? 'Auf Anfrage' : money(Number(b.total_price))}</div>
-                  <button onClick={() => markBookingPaid(b)} className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-black">Barzahlung erhalten</button>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => markBookingPaid(b)} className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-black">Bar bezahlt</button>
+                    <button onClick={() => markBookingOnlinePaid(b)} className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-black">Online bezahlt</button>
+                    <button onClick={() => moveBookingToTrash(b, 'Storniert')} className="rounded-xl border border-red-400/20 bg-red-400/[0.07] px-4 py-2 text-sm font-medium text-red-200 hover:bg-red-400/10">Storniert</button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -543,40 +842,8 @@ export default function BuchhaltungPage() {
                 <div className="text-xs font-semibold uppercase tracking-[.2em] text-amber-400">Kassenbuch</div>
                 <h2 className="mt-2 text-2xl font-semibold">Bewegungen {year}</h2>
               </div>
-              <button onClick={() => setFormOpen((v) => !v)} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black">+ Eintrag</button>
+              <button onClick={() => openEntryModal('business_expense')} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black">+ Ausgabe erfassen</button>
             </div>
-
-            {formOpen && (
-              <form onSubmit={addEntry} className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-2">
-                <label className="text-sm text-zinc-400">Art
-                  <select value={entryType} onChange={(e) => setEntryType(e.target.value as EntryType)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#11120f] px-3 py-3 text-white">
-                    <option value="business_expense">Betriebsausgabe</option>
-                    <option value="bank_deposit">Bankeinzahlung</option>
-                    <option value="private_withdrawal">Privatentnahme</option>
-                    <option value="private_contribution">Privateinlage</option>
-                  </select>
-                </label>
-                <label className="text-sm text-zinc-400">Datum
-                  <input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#11120f] px-3 py-3 text-white" />
-                </label>
-                <label className="text-sm text-zinc-400">Betrag €
-                  <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" className="mt-2 w-full rounded-xl border border-white/10 bg-[#11120f] px-3 py-3 text-white" />
-                </label>
-                <label className="text-sm text-zinc-400">Geschäftspartner / Empfänger
-                  <input value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="z. B. TÜV, Tankstelle, Privat" className="mt-2 w-full rounded-xl border border-white/10 bg-[#11120f] px-3 py-3 text-white" />
-                </label>
-                <label className="text-sm text-zinc-400 md:col-span-2">Beschreibung
-                  <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="z. B. TÜV Anhänger 1" className="mt-2 w-full rounded-xl border border-white/10 bg-[#11120f] px-3 py-3 text-white" />
-                </label>
-                <label className="text-sm text-zinc-400 md:col-span-2">Beleg / Referenz (optional)
-                  <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Rechnungsnummer, Einzahlungsbeleg etc." className="mt-2 w-full rounded-xl border border-white/10 bg-[#11120f] px-3 py-3 text-white" />
-                </label>
-                <div className="md:col-span-2 flex gap-2">
-                  <button type="submit" className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black">Speichern</button>
-                  <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-400">Abbrechen</button>
-                </div>
-              </form>
-            )}
 
             <div className="mt-5 overflow-x-auto">
               <table className="min-w-[900px] w-full text-left text-sm">
@@ -604,13 +871,7 @@ export default function BuchhaltungPage() {
                           {e.entry_type !== 'correction' && !e.correction_of && (
                             <button onClick={() => correctEntry(e)} className="text-xs text-zinc-500 hover:text-white">Korrigieren</button>
                           )}
-                          <button
-                            onClick={() => deleteTestEntry(e)}
-                            className="text-xs text-red-400/70 hover:text-red-300"
-                            title="Nur zum Löschen von Testdaten"
-                          >
-                            Test löschen
-                          </button>
+                          <button onClick={() => moveLedgerEntryToTrash(e)} className="text-xs text-red-400/70 hover:text-red-300">Papierkorb</button>
                         </div>
                       </td>
                     </tr>
@@ -665,37 +926,50 @@ export default function BuchhaltungPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2rem] border border-red-400/15 bg-red-400/[0.04] p-5 md:p-7">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[.2em] text-red-300">Nur Testphase</div>
-            <h2 className="mt-2 text-2xl font-semibold">Stornierte Testbuchungen löschen</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500">
-              Hier kannst du während der Entwicklung stornierte Testbuchungen endgültig entfernen.
-              Im echten Betrieb sollten Buchungen und Buchhaltungsdaten grundsätzlich nachvollziehbar erhalten bleiben.
-            </p>
+        <section className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.03] p-5 md:p-7">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[.2em] text-zinc-500">Papierkorb</div>
+              <h2 className="mt-2 text-2xl font-semibold">Gelöschte / stornierte Vorgänge</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">
+                Wiederhergestellte Mietanfragen erscheinen anschließend wieder oben bei den offenen Zahlungen.
+              </p>
+            </div>
+            <div className="text-sm text-zinc-600">{trashBookings.length + trashEntries.filter((e) => !e.booking_id).length} Einträge</div>
           </div>
 
           <div className="mt-5 grid gap-3">
-            {cancelledBookings.length === 0 && (
+            {trashBookings.length === 0 && trashEntries.filter((e) => !e.booking_id).length === 0 && (
               <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-600">
-                Keine stornierten Buchungen vorhanden.
+                Papierkorb ist leer.
               </div>
             )}
 
-            {cancelledBookings.map((booking) => (
+            {trashBookings.map((booking) => (
               <div key={booking.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-black/20 p-4">
                 <div>
-                  <div className="font-medium">{booking.trailer_title}</div>
-                  <div className="mt-1 text-xs text-zinc-500">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-red-400/10 px-2.5 py-1 text-[11px] text-red-200">Anfrage</span>
+                    <div className="font-medium">{booking.trailer_title}</div>
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-500">
                     {profiles[booking.user_id]?.full_name || 'Kunde'} · {dateDE(booking.start_date)} · {booking.id.slice(0,8).toUpperCase()}
                   </div>
                 </div>
-                <button
-                  onClick={() => deleteCancelledTestBooking(booking)}
-                  className="rounded-xl border border-red-400/20 bg-red-400/[0.06] px-4 py-2 text-sm text-red-200 hover:bg-red-400/10"
-                >
-                  Testbuchung löschen
-                </button>
+                <button onClick={() => restoreTrashBooking(booking)} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black">Wiederherstellen</button>
+              </div>
+            ))}
+
+            {trashEntries.filter((e) => !e.booking_id).map((entry) => (
+              <div key={entry.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-black/20 p-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-zinc-400/10 px-2.5 py-1 text-[11px] text-zinc-300">Kassenbuch</span>
+                    <div className="font-medium">{entry.description}</div>
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-500">{entry.receipt_number} · {money(Number(entry.amount))}</div>
+                </div>
+                <button onClick={() => restoreTrashEntry(entry)} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black">Wiederherstellen</button>
               </div>
             ))}
           </div>

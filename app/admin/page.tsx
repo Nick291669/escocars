@@ -71,6 +71,7 @@ export default function AdminPage() {
     const [bookingResult, profileResult] = await Promise.all([
       supabase.from('bookings')
         .select('id,user_id,trailer_title,start_date,end_date,pickup_time,days,total_price,payment_method,status,created_at')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('id,full_name,email,phone'),
     ])
