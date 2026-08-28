@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { urlFor } from '@/sanity/lib/client'
+import { supabase } from '@/lib/supabase/client'
 
 type SanityImage = {
   _type: 'image'
@@ -126,6 +127,10 @@ export default function Page() {
   const [returnDate, setReturnDate] = useState('')
   const [homeCalendarOpen, setHomeCalendarOpen] = useState(false)
   const [homeCalendarMonth, setHomeCalendarMonth] = useState(() => homeMonthStart(new Date()))
+  const [availabilityApplied, setAvailabilityApplied] = useState(false)
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [unavailableTrailerIds, setUnavailableTrailerIds] = useState<Set<string>>(new Set())
+  const [availabilityError, setAvailabilityError] = useState('')
   const homeToday = homeIsoDate(new Date())
   const homeDays = useMemo(() => homeCalendarDays(homeCalendarMonth), [homeCalendarMonth])
 
@@ -180,9 +185,13 @@ export default function Page() {
         trailer.title?.toLowerCase().includes(term) ||
         trailer.category?.toLowerCase().includes(term) ||
         trailer.shortDescription?.toLowerCase().includes(term)
-      return categoryMatch && searchMatch
+
+      const availabilityMatch =
+        !availabilityApplied || !unavailableTrailerIds.has(trailer._id)
+
+      return categoryMatch && searchMatch && availabilityMatch
     })
-  }, [trailers, selectedCategory, search])
+  }, [trailers, selectedCategory, search, availabilityApplied, unavailableTrailerIds])
 
   function getImage(image?: SanityImage) {
     return image ? urlFor(image).width(1400).height(900).url() : ''
@@ -191,6 +200,54 @@ export default function Page() {
   function openTrailer(trailer: Trailer) {
     setSelectedTrailer(trailer)
     setSelectedImage(getImage(trailer.heroImage) || getImage(trailer.gallery?.[0]) || '')
+  }
+
+  async function checkHomeAvailability() {
+    setAvailabilityError('')
+
+    // Ohne vollständigen Zeitraum einfach alle Anhänger anzeigen und zur Flotte scrollen.
+    if (!pickupDate || !returnDate) {
+      setAvailabilityApplied(false)
+      setUnavailableTrailerIds(new Set())
+      window.setTimeout(() => {
+        document.getElementById('anhaenger')?.scrollIntoView({ behavior: 'smooth' })
+      }, 50)
+      return
+    }
+
+    setAvailabilityLoading(true)
+
+    const { data, error } = await supabase.rpc('get_unavailable_trailer_ids', {
+      p_start_date: pickupDate,
+      p_end_date: returnDate,
+    })
+
+    setAvailabilityLoading(false)
+
+    if (error) {
+      console.error('Verfügbarkeitsprüfung Startseite:', error)
+      setAvailabilityError('Die Verfügbarkeit konnte gerade nicht geprüft werden.')
+      return
+    }
+
+    setUnavailableTrailerIds(
+      new Set<string>((data || []).map((row: { trailer_id: string }) => String(row.trailer_id))),
+    )
+    setAvailabilityApplied(true)
+    setSelectedCategory('Alle')
+    setSearch('')
+
+    window.setTimeout(() => {
+      document.getElementById('anhaenger')?.scrollIntoView({ behavior: 'smooth' })
+    }, 50)
+  }
+
+  function clearHomeAvailability() {
+    setPickupDate('')
+    setReturnDate('')
+    setAvailabilityApplied(false)
+    setUnavailableTrailerIds(new Set())
+    setAvailabilityError('')
   }
 
   function scrollToFleet() {
@@ -304,12 +361,32 @@ export default function Page() {
                       <div className="mt-1 font-medium text-zinc-200">{homeFormatDate(returnDate)}</div>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs text-amber-300">Kalender öffnen · Grün verfügbar</div>
+                  <div className="mt-3 text-xs text-amber-300">Kalender öffnen · Zeitraum auswählen</div>
                 </button>
 
-                <Link href={`/mieten?from=${encodeURIComponent(pickupDate)}&to=${encodeURIComponent(returnDate)}`} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 font-semibold text-black transition hover:bg-amber-300">
-                  Verfügbarkeit prüfen <Icon name="arrow" />
-                </Link>
+                <button
+                  type="button"
+                  onClick={checkHomeAvailability}
+                  disabled={availabilityLoading}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-4 font-semibold text-black transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-70"
+                >
+                  {availabilityLoading ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+                      Verfügbarkeit wird geprüft …
+                    </>
+                  ) : (
+                    <>
+                      Verfügbarkeit prüfen <Icon name="arrow" />
+                    </>
+                  )}
+                </button>
+
+                {availabilityError && (
+                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-400/[0.07] px-4 py-3 text-sm text-red-200">
+                    {availabilityError}
+                  </div>
+                )}
 
                 <div className="mt-5 grid grid-cols-3 divide-x divide-white/10 rounded-xl border border-white/10 bg-black/20 py-4 text-center">
                   <div><div className="text-lg font-semibold text-white">ab 25 €</div><div className="mt-1 text-[11px] text-zinc-500">pro Tag</div></div>
@@ -344,7 +421,23 @@ export default function Page() {
               <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">Anhänger für jeden Einsatz</h2>
               <p className="mt-4 max-w-2xl leading-7 text-zinc-400">Vom kompakten Kastenanhänger bis zum Autotransporter. Alle wichtigen Daten und Preise auf einen Blick.</p>
             </div>
-            <div className="text-sm text-zinc-500">{filteredTrailers.length} Anhänger gefunden</div>
+            <div className="text-right">
+              <div className="text-sm text-zinc-500">{filteredTrailers.length} Anhänger gefunden</div>
+              {availabilityApplied && pickupDate && returnDate && (
+                <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                  <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.07] px-3 py-1.5 text-xs text-amber-200">
+                    Verfügbar: {homeFormatDate(pickupDate)} – {homeFormatDate(returnDate)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearHomeAvailability}
+                    className="text-xs text-zinc-500 transition hover:text-white"
+                  >
+                    Zeitraum zurücksetzen
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
@@ -401,7 +494,23 @@ export default function Page() {
               <div className="mt-2 text-sm text-zinc-500">Prüfe deine Sanity-Projektverbindung. Demo-Anhänger werden bewusst nicht mehr angezeigt.</div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center text-zinc-400">Noch keine Anhänger vorhanden oder keine passenden Anhänger gefunden.</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center text-zinc-400">
+              {availabilityApplied ? (
+                <>
+                  <div className="text-lg font-semibold text-white">In diesem Zeitraum ist aktuell kein Anhänger verfügbar.</div>
+                  <div className="mt-2 text-sm text-zinc-500">Wähle oben einen anderen Zeitraum oder setze den Filter zurück.</div>
+                  <button
+                    type="button"
+                    onClick={clearHomeAvailability}
+                    className="mt-5 rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black"
+                  >
+                    Zeitraum zurücksetzen
+                  </button>
+                </>
+              ) : (
+                <>Noch keine Anhänger vorhanden oder keine passenden Anhänger gefunden.</>
+              )}
+            </div>
           )}
         </section>
 
@@ -605,7 +714,7 @@ export default function Page() {
                           : selected
                             ? 'border border-amber-300 bg-amber-400 text-black font-semibold'
                             : item.inCurrentMonth
-                              ? 'border border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-100 hover:bg-emerald-400/20'
+                              ? 'border border-white/10 bg-white/[0.035] text-zinc-200 hover:border-amber-400/30 hover:bg-white/[0.06]'
                               : 'text-zinc-700 hover:bg-white/5'
                       }`}
                     >
@@ -616,17 +725,11 @@ export default function Page() {
               </div>
 
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs">
-                <div className="flex items-center gap-2 text-zinc-500">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  Verfügbarer Zeitraum
-                </div>
+                <div className="text-zinc-500">Erst Abholung, danach Rückgabe auswählen.</div>
                 {(pickupDate || returnDate) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setPickupDate('')
-                      setReturnDate('')
-                    }}
+                    onClick={clearHomeAvailability}
                     className="text-zinc-400 hover:text-white"
                   >
                     Auswahl löschen
@@ -691,7 +794,12 @@ export default function Page() {
 
                 <div className="mt-6 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] p-5">
                   <div className="flex items-end justify-between gap-3"><div><div className="text-xs text-zinc-500">Mietpreis ab</div><div className="mt-1 text-3xl font-semibold">{selectedTrailer.pricePerDay || 'Auf Anfrage'} <span className="text-sm font-normal text-zinc-500">/ Tag</span></div></div><div className="text-right text-xs text-zinc-500">Kaution<br/><span className="text-sm text-zinc-300">{selectedTrailer.deposit || '—'}</span></div></div>
-                  <Link href={`/mieten?trailer=${encodeURIComponent(selectedTrailer._id)}`} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Diesen Anhänger mieten <Icon name="arrow" /></Link>
+                  <Link
+                    href={`/mieten?trailer=${encodeURIComponent(selectedTrailer._id)}${pickupDate && returnDate ? `&from=${encodeURIComponent(pickupDate)}&to=${encodeURIComponent(returnDate)}` : ''}`}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300"
+                  >
+                    Diesen Anhänger mieten <Icon name="arrow" />
+                  </Link>
                 </div>
                 <p className="mt-4 text-[11px] leading-5 text-zinc-600">* Die tatsächlich benötigte Führerscheinklasse hängt vom Zugfahrzeug und der zulässigen Gesamtmasse des Gespanns ab.</p>
               </div>
