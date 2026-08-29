@@ -514,6 +514,22 @@ export default function Page() {
           )}
         </section>
 
+        <section className="mx-auto max-w-7xl px-5 pb-4 md:px-6 md:pb-8">
+          <div className="rounded-[1.75rem] border border-amber-400/20 bg-amber-400/[0.06] p-5 md:p-6">
+            <div className="flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300">
+                <Icon name="shield" className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-semibold text-amber-100">Wichtiger Buchungs- und Stornierungshinweis</div>
+                <p className="mt-2 text-sm leading-7 text-zinc-400">
+                  Falls Ihre Buchungsanfrage abgelehnt oder storniert wird, informieren wir Sie rechtzeitig. Erhalten Sie keine solche Mitteilung, ist keine weitere Bestätigung erforderlich; Ihre Reservierung gilt mit dem Absenden der Anfrage als verbindlich. Eine kostenlose Stornierung ist bis 24 Stunden vor Mietbeginn möglich. Bei späteren Stornierungen berechnen wir 50 % des vereinbarten Mietpreises als Stornierungsgebühr.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="ablauf" className="scroll-mt-24 border-y border-white/10 bg-white/[0.025]">
           <div className="mx-auto max-w-7xl px-5 py-20 md:px-6 md:py-24">
             <div className="max-w-2xl">
@@ -609,9 +625,32 @@ export default function Page() {
                 <p className="mt-5 max-w-2xl leading-8 text-zinc-400">Wähle deinen Mietzeitraum und entdecke die passenden Anhänger für deinen Transport.</p>
                 <Link href="/mieten" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3.5 text-sm font-semibold text-black transition hover:bg-amber-300">Verfügbarkeit prüfen <Icon name="arrow" /></Link>
               </div>
-              <div className="grid gap-3 text-sm text-zinc-300 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4"><Icon name="pin" className="h-5 w-5 text-amber-400" /><span>Standort wird noch eingetragen</span></div>
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4"><Icon name="phone" className="h-5 w-5 text-amber-400" /><span>Telefon wird noch eingetragen</span></div>
+              <div>
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+                  <img
+                    src="/liwa-standort-vorschau.png"
+                    alt="Standortvorschau LIWA Anhängervermietung in Lichtenwald"
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 text-sm text-zinc-300">
+                  <a
+                    href="https://www.google.com/maps/search/?api=1&query=Am%20freien%20Feld%2018%2C%2073669%20Lichtenwald"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4 transition hover:border-amber-400/30"
+                  >
+                    <Icon name="pin" className="h-5 w-5 shrink-0 text-amber-400" />
+                    <span>Am freien Feld 18, 73669 Lichtenwald</span>
+                  </a>
+                  <a
+                    href="tel:+4915170387967"
+                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4 transition hover:border-amber-400/30"
+                  >
+                    <Icon name="phone" className="h-5 w-5 shrink-0 text-amber-400" />
+                    <span>01517 0387967</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -790,6 +829,13 @@ export default function Page() {
                   ].map(([icon, label, value]) => (
                     <div key={label as string} className="rounded-xl border border-white/10 bg-black/20 p-3.5"><div className="flex items-center gap-2 text-xs text-zinc-500"><Icon name={icon as string} className="h-4 w-4" />{label}</div><div className="mt-2 font-medium text-zinc-200">{value || '—'}</div></div>
                   ))}
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/[0.055] p-4">
+                  <div className="text-sm font-semibold text-amber-100">Buchung & Stornierung</div>
+                  <p className="mt-2 text-xs leading-6 text-zinc-400">
+                    Falls Ihre Buchungsanfrage abgelehnt oder storniert wird, informieren wir Sie rechtzeitig. Erhalten Sie keine solche Mitteilung, ist keine weitere Bestätigung erforderlich; Ihre Reservierung gilt mit dem Absenden der Anfrage als verbindlich. Eine kostenlose Stornierung ist bis 24 Stunden vor Mietbeginn möglich. Bei späteren Stornierungen berechnen wir 50 % des vereinbarten Mietpreises als Stornierungsgebühr.
+                  </p>
                 </div>
 
                 <div className="mt-6 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] p-5">

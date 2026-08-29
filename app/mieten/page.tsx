@@ -133,6 +133,7 @@ export default function RentPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [successId, setSuccessId] = useState('')
+  const [stripeRedirecting, setStripeRedirecting] = useState(false)
 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [pickupTimeOpen, setPickupTimeOpen] = useState(false)
@@ -381,18 +382,18 @@ export default function RentPage() {
       }
 
       const bookingId = String(result.data || '')
-      setSuccessId(bookingId)
 
-      // Mailversand ist absichtlich getrennt von der Buchung:
-      // Selbst wenn der Mailanbieter einmal ausfällt, bleibt die Buchung gespeichert.
-      try {
-        const { data: currentSession } = await supabase.auth.getSession()
-        const accessToken = currentSession.session?.access_token
+      // E-Mail + Admin-Push nach erfolgreicher Mietanfrage.
+      // Bei Online-Zahlung wird danach direkt Stripe Checkout geöffnet.
+      const { data: currentSession } = await supabase.auth.getSession()
+      const accessToken = currentSession.session?.access_token
 
-        if (!accessToken) {
-          setEmailStatus('failed')
-        } else {
-          const mailResponse = await fetch('/api/booking-email', {
+      if (!accessToken) {
+        setEmailStatus('failed')
+        setPushStatus('failed')
+      } else {
+        try {
+          const notificationResponse = await fetch('/api/booking-email', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -401,9 +402,9 @@ export default function RentPage() {
             body: JSON.stringify({ bookingId }),
           })
 
-          const notificationResult = await mailResponse.json().catch(() => null)
+          const notificationResult = await notificationResponse.json().catch(() => null)
 
-          if (mailResponse.ok) {
+          if (notificationResponse.ok) {
             setEmailStatus(notificationResult?.emailSent ? 'sent' : 'failed')
             setPushStatus(notificationResult?.pushSent ? 'sent' : 'failed')
           } else {
@@ -411,12 +412,48 @@ export default function RentPage() {
             setPushStatus('failed')
             console.error('Buchungs-Benachrichtigung:', notificationResult)
           }
+        } catch (notificationError) {
+          console.error('Buchungs-Benachrichtigung:', notificationError)
+          setEmailStatus('failed')
+          setPushStatus('failed')
         }
-      } catch (notificationError) {
-        console.error('Buchungs-Benachrichtigung:', notificationError)
-        setEmailStatus('failed')
-        setPushStatus('failed')
       }
+
+      if (paymentMethod === 'online') {
+        if (!accessToken) {
+          setSuccessId(bookingId)
+          setError('Die Buchung ist gespeichert, aber die Online-Zahlung konnte nicht gestartet werden. Bitte logge dich erneut ein.')
+          return
+        }
+
+        setStripeRedirecting(true)
+
+        const checkoutResponse = await fetch('/api/stripe/create-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ bookingId }),
+        })
+
+        const checkout = await checkoutResponse.json().catch(() => null)
+
+        if (!checkoutResponse.ok || !checkout?.url) {
+          setStripeRedirecting(false)
+          setSuccessId(bookingId)
+          setError(
+            checkout?.error ||
+              'Die Buchung wurde gespeichert, aber Stripe Checkout konnte nicht geöffnet werden.',
+          )
+          return
+        }
+
+        window.location.href = checkout.url
+        return
+      }
+
+      setSuccessId(bookingId)
     } catch (bookingError) {
       setError(
         bookingError instanceof Error
@@ -436,7 +473,7 @@ export default function RentPage() {
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/10 border-t-amber-400" />
             <div className="mt-5 text-lg font-semibold">Buchung wird verarbeitet</div>
             <p className="mt-2 text-sm leading-6 text-zinc-500">
-              Bitte kurz warten. Deine Verfügbarkeit und Buchung werden geprüft.
+              {stripeRedirecting ? 'Du wirst jetzt sicher zu Stripe weitergeleitet.' : 'Bitte kurz warten. Deine Verfügbarkeit und Buchung werden geprüft.'}
             </p>
           </div>
         </div>
@@ -870,12 +907,12 @@ export default function RentPage() {
                 >
                   <div className="flex items-center gap-2 font-semibold">
                     Online bezahlen
-                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                      Stripe später
+                    <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
+                      Stripe
                     </span>
                   </div>
                   <div className="mt-1 text-sm leading-5 text-zinc-500">
-                    Die Auswahl wird gespeichert. Die echte Online-Zahlung wird später angebunden.
+                    Nach der Anfrage wirst du sicher zu Stripe weitergeleitet und bezahlst den Mietpreis online.
                   </div>
                 </button>
               </div>
@@ -883,6 +920,12 @@ export default function RentPage() {
               <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-3 text-sm leading-6 text-amber-100">
                 <span className="font-semibold">Hinweis:</span> Die Kaution muss immer bar bei
                 der Abholung hinterlegt werden – unabhängig von der gewählten Zahlungsart.
+              </div>
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="text-sm font-semibold text-white">Verbindliche Anfrage & Stornierung</div>
+                <p className="mt-2 text-xs leading-6 text-zinc-400">
+                  Falls Ihre Buchungsanfrage abgelehnt oder storniert wird, informieren wir Sie rechtzeitig. Erhalten Sie keine solche Mitteilung, ist keine weitere Bestätigung erforderlich; Ihre Reservierung gilt mit dem Absenden der Anfrage als verbindlich. Eine kostenlose Stornierung ist bis 24 Stunden vor Mietbeginn möglich. Bei späteren Stornierungen berechnen wir 50 % des vereinbarten Mietpreises als Stornierungsgebühr.
+                </p>
               </div>
             </section>
 
@@ -1017,8 +1060,8 @@ export default function RentPage() {
               )}
 
               <p className="mt-4 text-xs leading-5 text-zinc-600">
-                Bei „Online bezahlen“ wird aktuell noch keine Zahlung ausgelöst. Stripe kommt
-                später. Die Kaution bleibt immer Barzahlung.
+                Bei „Online bezahlen“ wird der Mietpreis über Stripe bezahlt. Die Kaution bleibt
+                unabhängig davon immer Barzahlung bei der Abholung.
               </p>
             </aside>
           </div>
