@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     const { data: booking, error: bookingError } = await admin
       .from('bookings')
       .select(
-        'id,user_id,trailer_title,start_date,end_date,pickup_time,days,total_price,payment_method,status,created_at',
+        'id,user_id,trailer_title,start_date,end_date,pickup_time,pickup_time_wish,days,total_price,payment_method,status,created_at',
       )
       .eq('id', bookingId)
       .single()
@@ -228,11 +228,10 @@ export async function POST(request: NextRequest) {
       ['Anhänger', booking.trailer_title],
       ['Abholung', `${dateDE(booking.start_date)} · ${time}`],
       ['Rückgabe', `${dateDE(booking.end_date)} · ${time}`],
+      ['Uhrzeitwunsch', booking.pickup_time_wish || 'Kein zusätzlicher Wunsch'],
       ['Mietdauer', `${booking.days} Tag${booking.days === 1 ? '' : 'e'}`],
       ['Mietpreis', money(booking.total_price)],
       ['Zahlungsart', paymentLabel(booking.payment_method)],
-      ['Abholadresse', 'Am freien Feld 18, 73669 Lichtenwald'],
-      ['Kontakt / Telefon', '01517 0387967'],
       ['Status', 'Mietanfrage eingegangen'],
       ['Buchungsnummer', bookingNumber],
     ]

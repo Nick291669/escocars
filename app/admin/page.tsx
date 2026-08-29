@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { client, urlFor } from '@/sanity/lib/client'
+import { trailersQuery } from '@/sanity/lib/queries'
 
 type Status = 'pending' | 'confirmed' | 'cancelled' | 'completed'
 type PaymentMethod = 'cash' | 'online'
@@ -14,6 +16,7 @@ type Booking = {
   start_date: string
   end_date: string
   pickup_time: string | null
+  pickup_time_wish: string | null
   days: number
   total_price: number | null
   payment_method: PaymentMethod
@@ -27,6 +30,33 @@ type Profile = {
   email: string
   phone: string
 }
+
+type SanityImage = {
+  asset?: {
+    _ref?: string
+  }
+}
+
+type Trailer = {
+  _id: string
+  title: string
+  category?: string
+  heroImage?: SanityImage
+  gallery?: SanityImage[]
+}
+
+const ALL_PICKUP_TIMES = [
+  '08:00',
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+]
 
 const labels: Record<Status, string> = {
   pending: 'Angefragt',
@@ -47,6 +77,10 @@ export default function AdminPage() {
   const [busyId, setBusyId] = useState('')
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all' | Status>('pending')
+  const [trailers, setTrailers] = useState<Trailer[]>([])
+  const [pickupTimes, setPickupTimes] = useState<Record<string, string[]>>({})
+  const [savingTimesId, setSavingTimesId] = useState('')
+  const [timesNotice, setTimesNotice] = useState('')
 
   async function load() {
     setLoading(true)
@@ -68,12 +102,14 @@ export default function AdminPage() {
 
     setAuthorized(true)
 
-    const [bookingResult, profileResult] = await Promise.all([
+    const [bookingResult, profileResult, pickupSettingsResult, publicTrailers] = await Promise.all([
       supabase.from('bookings')
-        .select('id,user_id,trailer_title,start_date,end_date,pickup_time,days,total_price,payment_method,status,created_at')
+        .select('id,user_id,trailer_title,start_date,end_date,pickup_time,pickup_time_wish,days,total_price,payment_method,status,created_at')
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('id,full_name,email,phone'),
+      supabase.from('trailer_pickup_settings').select('trailer_id,available_times'),
+      client.fetch<Trailer[]>(trailersQuery),
     ])
 
     if (bookingResult.error) setError(bookingResult.error.message)
@@ -86,6 +122,19 @@ export default function AdminPage() {
       setProfiles(map)
     }
 
+    if (pickupSettingsResult.error) {
+      setError((old) => old || `Abholzeiten konnten nicht geladen werden: ${pickupSettingsResult.error.message}`)
+    } else {
+      const map: Record<string, string[]> = {}
+      for (const row of pickupSettingsResult.data || []) {
+        map[String(row.trailer_id)] = Array.isArray(row.available_times)
+          ? row.available_times.map(String)
+          : []
+      }
+      setPickupTimes(map)
+    }
+
+    setTrailers(publicTrailers || [])
     setLoading(false)
   }
 
@@ -129,6 +178,66 @@ export default function AdminPage() {
     setBookings((items) =>
       items.map((item) => item.id === id ? { ...item, status } : item),
     )
+  }
+
+  function trailerImage(trailer: Trailer) {
+    const image = trailer.heroImage || trailer.gallery?.[0]
+    try {
+      return image?.asset?._ref
+        ? urlFor(image).width(720).height(440).fit('crop').url()
+        : ''
+    } catch {
+      return ''
+    }
+  }
+
+  function currentTimes(trailerId: string) {
+    return pickupTimes[trailerId] ?? ALL_PICKUP_TIMES
+  }
+
+  function togglePickupTime(trailerId: string, time: string) {
+    const active = currentTimes(trailerId)
+    setPickupTimes((old) => ({
+      ...old,
+      [trailerId]: active.includes(time)
+        ? active.filter((item) => item !== time)
+        : [...active, time].sort(),
+    }))
+    setTimesNotice('')
+  }
+
+  async function savePickupTimes(trailerId: string) {
+    setSavingTimesId(trailerId)
+    setTimesNotice('')
+    setError('')
+
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth.user) {
+      setSavingTimesId('')
+      setError('Deine Sitzung ist abgelaufen.')
+      return
+    }
+
+    const { error: saveError } = await supabase
+      .from('trailer_pickup_settings')
+      .upsert(
+        {
+          trailer_id: trailerId,
+          available_times: currentTimes(trailerId),
+          updated_by: auth.user.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'trailer_id' },
+      )
+
+    setSavingTimesId('')
+
+    if (saveError) {
+      setError(saveError.message)
+      return
+    }
+
+    setTimesNotice('Abholzeiten gespeichert.')
   }
 
   if (loading) {
@@ -177,6 +286,110 @@ export default function AdminPage() {
           <p className="mt-3 text-zinc-500">Anfragen bestätigen, ablehnen und alle wichtigen Mieterdaten einsehen.</p>
         </div>
 
+        <section className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.03] p-5 md:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">
+                Abholzeiten
+              </div>
+              <h2 className="mt-2 text-2xl font-semibold">Verfügbare Zeiten je Anhänger</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
+                Hier legst du für jeden aktuell veröffentlichten Anhänger fest, welche festen
+                Abholzeiten Kunden bei der Online-Reservierung auswählen können. Die Einstellung
+                gilt generell für den jeweiligen Anhänger und nicht für einzelne Tage.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-xs text-zinc-500">
+              {trailers.length} öffentliche Anhänger
+            </div>
+          </div>
+
+          {timesNotice && (
+            <div className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] px-4 py-3 text-sm text-emerald-200">
+              {timesNotice}
+            </div>
+          )}
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-2">
+            {trailers.map((trailer) => {
+              const activeTimes = currentTimes(trailer._id)
+              const image = trailerImage(trailer)
+
+              return (
+                <article
+                  key={trailer._id}
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-black/20"
+                >
+                  <div className="grid sm:grid-cols-[160px_1fr]">
+                    <div className="min-h-32 bg-white/[0.03]">
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={trailer.title}
+                          className="h-full min-h-32 w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full min-h-32 items-center justify-center text-xs text-zinc-600">
+                          Kein Bild
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-zinc-600">
+                        {trailer.category || 'Anhänger'}
+                      </div>
+                      <h3 className="mt-1 text-lg font-semibold">{trailer.title}</h3>
+                      <div className="mt-1 text-xs text-zinc-500">
+                        {activeTimes.length} feste Abholzeit{activeTimes.length === 1 ? '' : 'en'} aktiv
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/10 p-4">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                      {ALL_PICKUP_TIMES.map((time) => {
+                        const active = activeTimes.includes(time)
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            onClick={() => togglePickupTime(trailer._id, time)}
+                            className={`rounded-xl border px-2 py-2.5 text-sm transition ${
+                              active
+                                ? 'border-emerald-400/30 bg-emerald-400/[0.12] font-semibold text-emerald-200'
+                                : 'border-white/10 bg-white/[0.025] text-zinc-600 hover:text-zinc-300'
+                            }`}
+                          >
+                            {time}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {activeTimes.length === 0 && (
+                      <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-xs leading-5 text-amber-100">
+                        Für diesen Anhänger ist momentan keine feste Abholzeit freigegeben.
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => savePickupTimes(trailer._id)}
+                        disabled={savingTimesId === trailer._id}
+                        className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+                      >
+                        {savingTimesId === trailer._id ? 'Speichert …' : 'Zeiten speichern'}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+
         <div className="mt-7 flex flex-wrap gap-2">
           {([
             ['pending', 'Offene Anfragen'],
@@ -223,6 +436,10 @@ export default function AdminPage() {
                     <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                       <div><div className="text-xs text-zinc-600">Abholung</div><div className="mt-1">{dateDE(booking.start_date)} · {booking.pickup_time?.slice(0,5) || '—'} Uhr</div></div>
                       <div><div className="text-xs text-zinc-600">Rückgabe</div><div className="mt-1">{dateDE(booking.end_date)} · {booking.pickup_time?.slice(0,5) || '—'} Uhr</div></div>
+                      <div className="sm:col-span-2">
+                        <div className="text-xs text-zinc-600">Zusätzlicher Uhrzeitwunsch</div>
+                        <div className="mt-1 text-amber-200">{booking.pickup_time_wish || 'Kein zusätzlicher Wunsch'}</div>
+                      </div>
                       <div><div className="text-xs text-zinc-600">Mietdauer</div><div className="mt-1">{booking.days} Tag{booking.days === 1 ? '' : 'e'}</div></div>
                       <div><div className="text-xs text-zinc-600">Preis</div><div className="mt-1">{booking.total_price == null ? 'Auf Anfrage' : `${Number(booking.total_price).toFixed(2).replace('.', ',')} €`}</div></div>
                       <div><div className="text-xs text-zinc-600">Zahlungsart</div><div className="mt-1">{booking.payment_method === 'online' ? 'Online-Zahlung' : 'Barzahlung'}</div></div>

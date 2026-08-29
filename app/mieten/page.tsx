@@ -35,6 +35,19 @@ type CalendarDay = {
   inCurrentMonth: boolean
 }
 
+const ALL_PICKUP_TIMES = [
+  '08:00',
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+]
+
 function moneyToNumber(value?: string) {
   if (!value) return 0
   const cleaned = value.replace(/[^0-9,.-]/g, '').replace(',', '.')
@@ -126,6 +139,8 @@ export default function RentPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [pickupTime, setPickupTime] = useState('')
+  const [pickupTimeWish, setPickupTimeWish] = useState('')
+  const [pickupTimeSettings, setPickupTimeSettings] = useState<Record<string, string[]>>({})
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash')
 
   const [loading, setLoading] = useState(true)
@@ -165,7 +180,24 @@ export default function RentPage() {
         setStartDate(query.get('from') || '')
         setEndDate(query.get('to') || '')
         setPickupTime(query.get('time') || '')
+        setPickupTimeWish(query.get('wish') || '')
         setPaymentMethod(query.get('payment') === 'online' ? 'online' : 'cash')
+
+        const { data: pickupSettings, error: pickupSettingsError } = await supabase
+          .from('trailer_pickup_settings')
+          .select('trailer_id,available_times')
+
+        if (pickupSettingsError) {
+          console.error('Abholzeiten:', pickupSettingsError)
+        } else {
+          const settingsMap: Record<string, string[]> = {}
+          for (const row of pickupSettings || []) {
+            settingsMap[String(row.trailer_id)] = Array.isArray(row.available_times)
+              ? row.available_times.map(String)
+              : []
+          }
+          setPickupTimeSettings(settingsMap)
+        }
 
         const initialDate = query.get('from')
         if (initialDate) {
@@ -283,10 +315,19 @@ export default function RentPage() {
   }, [availableTrailers, selectedId, availabilityLoading])
 
   const trailer = trailers.find((x) => x._id === selectedId)
+  const availablePickupTimes = selectedId
+    ? pickupTimeSettings[selectedId] ?? ALL_PICKUP_TIMES
+    : ALL_PICKUP_TIMES
   const days = useMemo(() => daysBetween(startDate, endDate), [startDate, endDate])
   const pricePerDay = moneyToNumber(trailer?.pricePerDay)
   const total = pricePerDay * days
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth])
+
+  useEffect(() => {
+    if (pickupTime && !availablePickupTimes.includes(pickupTime)) {
+      setPickupTime('')
+    }
+  }, [selectedId, pickupTimeSettings, pickupTime, availablePickupTimes])
 
   function openCalendar() {
     setError('')
@@ -352,9 +393,9 @@ export default function RentPage() {
           selectedId,
         )}&from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(
           endDate,
-        )}&time=${encodeURIComponent(pickupTime)}&payment=${encodeURIComponent(
-          paymentMethod,
-        )}`
+        )}&time=${encodeURIComponent(pickupTime)}&wish=${encodeURIComponent(
+          pickupTimeWish,
+        )}&payment=${encodeURIComponent(paymentMethod)}`
         window.location.href = `/login?next=${encodeURIComponent(next)}`
         return
       }
@@ -369,6 +410,7 @@ export default function RentPage() {
           p_price_per_day: pricePerDay || null,
           p_total_price: pricePerDay ? total : null,
           p_pickup_time: pickupTime,
+          p_pickup_time_wish: pickupTimeWish.trim() || null,
           p_payment_method: paymentMethod,
         }),
       )
@@ -507,18 +549,7 @@ export default function RentPage() {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {[
-                '08:00',
-                '09:00',
-                '10:00',
-                '11:00',
-                '12:00',
-                '13:00',
-                '14:00',
-                '15:00',
-                '16:00',
-                '17:00',
-              ].map((time) => {
+              {availablePickupTimes.map((time) => {
                 const selected = pickupTime === time
                 return (
                   <button
@@ -545,6 +576,33 @@ export default function RentPage() {
                   </button>
                 )
               })}
+            </div>
+
+            {availablePickupTimes.length === 0 && (
+              <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm leading-6 text-amber-100">
+                Für diesen Anhänger ist aktuell keine feste Online-Abholzeit freigegeben.
+                Bitte kontaktiere uns vor der Reservierung.
+              </div>
+            )}
+
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <label className="text-sm font-semibold text-white">
+                Uhrzeitwunsch <span className="font-normal text-zinc-600">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={pickupTimeWish}
+                onChange={(event) => setPickupTimeWish(event.target.value)}
+                maxLength={80}
+                placeholder="z. B. möglichst 18:30 Uhr"
+                className="mt-3 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-700 focus:border-amber-400/40"
+              />
+              <p className="mt-3 text-xs leading-6 text-zinc-500">
+                Ein Uhrzeitwunsch ist keine bestätigte Abholzeit. Wir prüfen deinen Wunsch
+                separat und geben dir eine eigene Rückmeldung, ob er möglich ist. Falls nicht,
+                schlagen wir dir nach Möglichkeit eine andere Uhrzeit vor. Bis dahin gilt die
+                oben ausgewählte feste Abholzeit.
+              </p>
             </div>
 
             <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm leading-6 text-amber-100">
@@ -876,6 +934,11 @@ export default function RentPage() {
                   <div className="mt-3 text-xs text-zinc-600">
                     Rückgabe automatisch zur gleichen Uhrzeit.
                   </div>
+                  {pickupTimeWish && (
+                    <div className="mt-3 rounded-xl border border-amber-400/15 bg-amber-400/[0.05] px-3 py-2 text-xs leading-5 text-amber-100">
+                      Uhrzeitwunsch: {pickupTimeWish}
+                    </div>
+                  )}
                 </button>
               </div>
 
@@ -1003,6 +1066,12 @@ export default function RentPage() {
                   <span>Rückgabe</span>
                   <span>{pickupTime ? `${pickupTime} Uhr` : '—'}</span>
                 </div>
+                {pickupTimeWish && (
+                  <div className="flex justify-between gap-5 text-zinc-400">
+                    <span>Uhrzeitwunsch</span>
+                    <span className="max-w-[55%] text-right text-amber-200">{pickupTimeWish}</span>
+                  </div>
+                )}
 
                 {pricePerDay > 0 && days > 0 && (
                   <div className="flex justify-between border-t border-white/10 pt-4 text-lg font-semibold">
