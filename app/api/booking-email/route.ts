@@ -231,6 +231,8 @@ export async function POST(request: NextRequest) {
       ['Mietdauer', `${booking.days} Tag${booking.days === 1 ? '' : 'e'}`],
       ['Mietpreis', money(booking.total_price)],
       ['Zahlungsart', paymentLabel(booking.payment_method)],
+      ['Abholadresse', 'Am freien Feld 18, 73669 Lichtenwald'],
+      ['Kontakt / Telefon', '01517 0387967'],
       ['Status', 'Mietanfrage eingegangen'],
       ['Buchungsnummer', bookingNumber],
     ]
