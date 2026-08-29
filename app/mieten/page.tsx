@@ -428,7 +428,6 @@ export default function RentPage() {
       const bookingId = String(result.data || '')
 
       // E-Mail + Admin-Push nach erfolgreicher Mietanfrage.
-      // Bei Online-Zahlung wird danach direkt Stripe Checkout geöffnet.
       const { data: currentSession } = await supabase.auth.getSession()
       const accessToken = currentSession.session?.access_token
 
@@ -483,7 +482,7 @@ export default function RentPage() {
             <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/10 border-t-amber-400" />
             <div className="mt-5 text-lg font-semibold">Buchung wird verarbeitet</div>
             <p className="mt-2 text-sm leading-6 text-zinc-500">
-              {stripeRedirecting ? 'Du wirst jetzt sicher zu Stripe weitergeleitet.' : 'Bitte kurz warten. Deine Verfügbarkeit und Buchung werden geprüft.'}
+              Bitte kurz warten. Deine Verfügbarkeit und Buchung werden geprüft.
             </p>
           </div>
         </div>
