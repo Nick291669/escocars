@@ -665,7 +665,16 @@ export default function Page() {
               <p className="mt-4 max-w-sm text-sm leading-6 text-zinc-500">Einfach den passenden Anhänger finden, Zeitraum wählen und unkompliziert mieten.</p>
             </div>
             <div className="text-sm"><div className="font-semibold text-zinc-200">Navigation</div><div className="mt-4 grid gap-2 text-zinc-500"><a href="#anhaenger" className="hover:text-white">Anhänger</a><a href="#ablauf" className="hover:text-white">Ablauf</a><a href="#faq" className="hover:text-white">FAQ</a><a href="#kontakt" className="hover:text-white">Kontakt</a></div></div>
-            <div className="text-sm"><div className="font-semibold text-zinc-200">Rechtliches</div><div className="mt-4 grid gap-2 text-zinc-500"><span>Impressum</span><span>Datenschutz</span><span>AGB / Mietbedingungen</span><a href="/studio" className="mt-2 text-zinc-700 hover:text-zinc-400">Admin</a></div></div>
+            <div className="text-sm">
+              <div className="font-semibold text-zinc-200">Rechtliches</div>
+              <div className="mt-4 grid gap-2 text-zinc-500">
+                <Link href="/impressum" className="transition hover:text-white">Impressum</Link>
+                <Link href="/datenschutz" className="transition hover:text-white">Datenschutz</Link>
+                <Link href="/agb" className="transition hover:text-white">AGB</Link>
+                <Link href="/mietbedingungen" className="transition hover:text-white">Mietbedingungen</Link>
+                <a href="/studio" className="mt-2 text-zinc-700 hover:text-zinc-400">Admin</a>
+              </div>
+            </div>
           </div>
           <div className="mt-10 border-t border-white/10 pt-6 text-xs text-zinc-600">© {new Date().getFullYear()} LIWA Anhängervermietung. Alle Rechte vorbehalten.</div>
         </div>

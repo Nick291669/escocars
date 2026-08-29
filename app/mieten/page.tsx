@@ -149,7 +149,6 @@ export default function RentPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [successId, setSuccessId] = useState('')
-  const [stripeRedirecting, setStripeRedirecting] = useState(false)
 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [pickupTimeOpen, setPickupTimeOpen] = useState(false)
@@ -380,6 +379,8 @@ export default function RentPage() {
       return setError('Bitte wähle einen gültigen Mietzeitraum aus.')
     if (!pickupTime) return setError('Bitte wähle eine Abholzeit aus.')
     if (!paymentMethod) return setError('Bitte wähle eine Zahlungsart aus.')
+    if (!legalAccepted)
+      return setError('Bitte bestätige zuerst die AGB und Mietbedingungen.')
     if (startDate < today) return setError('Das Startdatum darf nicht in der Vergangenheit liegen.')
     if (unavailableTrailerIds.has(trailer._id))
       return setError('Dieser Anhänger ist im gewählten Zeitraum nicht verfügbar.')
@@ -412,7 +413,7 @@ export default function RentPage() {
           p_total_price: pricePerDay ? total : null,
           p_pickup_time: pickupTime,
           p_pickup_time_wish: pickupTimeWish.trim() || null,
-          p_payment_method: paymentMethod,
+          p_payment_method: 'cash',
         }),
       )
 
@@ -460,40 +461,6 @@ export default function RentPage() {
           setEmailStatus('failed')
           setPushStatus('failed')
         }
-      }
-
-      if (paymentMethod === 'online') {
-        if (!accessToken) {
-          setSuccessId(bookingId)
-          setError('Die Buchung ist gespeichert, aber die Online-Zahlung konnte nicht gestartet werden. Bitte logge dich erneut ein.')
-          return
-        }
-
-        setStripeRedirecting(true)
-
-        const checkoutResponse = await fetch('/api/stripe/create-checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ bookingId }),
-        })
-
-        const checkout = await checkoutResponse.json().catch(() => null)
-
-        if (!checkoutResponse.ok || !checkout?.url) {
-          setStripeRedirecting(false)
-          setSuccessId(bookingId)
-          setError(
-            checkout?.error ||
-              'Die Buchung wurde gespeichert, aber Stripe Checkout konnte nicht geöffnet werden.',
-          )
-          return
-        }
-
-        window.location.href = checkout.url
-        return
       }
 
       setSuccessId(bookingId)
@@ -962,21 +929,18 @@ export default function RentPage() {
 
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('online')}
-                  className={`rounded-2xl border p-4 text-left transition ${
-                    paymentMethod === 'online'
-                      ? 'border-amber-400/70 bg-amber-400/[0.08]'
-                      : 'border-white/10 bg-black/20 hover:border-white/20'
-                  }`}
+                  disabled
+                  aria-disabled="true"
+                  className="cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left opacity-45"
                 >
-                  <div className="flex items-center gap-2 font-semibold">
-                    Online bezahlen
-                    <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
-                      Stripe
+                  <div className="flex items-center justify-between gap-3 font-semibold">
+                    <span>Online bezahlen</span>
+                    <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                      Demnächst
                     </span>
                   </div>
-                  <div className="mt-1 text-sm leading-5 text-zinc-500">
-                    Nach der Anfrage wirst du sicher zu Stripe weitergeleitet und bezahlst den Mietpreis online.
+                  <div className="mt-1 text-sm leading-5 text-zinc-600">
+                    Online-Zahlung ist derzeit noch nicht verfügbar.
                   </div>
                 </button>
               </div>
@@ -1088,6 +1052,36 @@ export default function RentPage() {
                 </div>
               )}
 
+              {!successId && (
+                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <input
+                    type="checkbox"
+                    checked={legalAccepted}
+                    onChange={(event) => setLegalAccepted(event.target.checked)}
+                    className="mt-1 h-4 w-4 shrink-0 accent-amber-400"
+                  />
+                  <span className="text-xs leading-6 text-zinc-500">
+                    Ich habe die{' '}
+                    <Link
+                      href="/agb"
+                      target="_blank"
+                      className="font-medium text-amber-300 hover:text-amber-200"
+                    >
+                      AGB
+                    </Link>
+                    {' '}und die{' '}
+                    <Link
+                      href="/mietbedingungen"
+                      target="_blank"
+                      className="font-medium text-amber-300 hover:text-amber-200"
+                    >
+                      Mietbedingungen
+                    </Link>
+                    {' '}gelesen und akzeptiere deren Geltung für meine verbindliche Reservierung.
+                  </span>
+                </label>
+              )}
+
               {successId ? (
                 <div className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-200">
                   <div className="font-semibold">Mietanfrage wurde gespeichert.</div>
@@ -1120,7 +1114,8 @@ export default function RentPage() {
                     !trailer ||
                     !startDate ||
                     !endDate ||
-                    !pickupTime
+                    !pickupTime ||
+                    !legalAccepted
                   }
                   onClick={createBooking}
                   className="mt-6 w-full rounded-xl bg-amber-400 px-5 py-3.5 font-semibold text-black transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1130,8 +1125,8 @@ export default function RentPage() {
               )}
 
               <p className="mt-4 text-xs leading-5 text-zinc-600">
-                Bei „Online bezahlen“ wird der Mietpreis über Stripe bezahlt. Die Kaution bleibt
-                unabhängig davon immer Barzahlung bei der Abholung.
+                Der Mietpreis wird derzeit bei der Abholung bar bezahlt. Die Kaution wird ebenfalls
+                bei der Abholung in bar hinterlegt. Online-Zahlung folgt zu einem späteren Zeitpunkt.
               </p>
             </aside>
           </div>
