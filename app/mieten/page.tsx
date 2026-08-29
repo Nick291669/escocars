@@ -142,6 +142,7 @@ export default function RentPage() {
   const [pickupTimeWish, setPickupTimeWish] = useState('')
   const [pickupTimeSettings, setPickupTimeSettings] = useState<Record<string, string[]>>({})
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash')
+  const [legalAccepted, setLegalAccepted] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [sanityError, setSanityError] = useState(false)
@@ -181,7 +182,7 @@ export default function RentPage() {
         setEndDate(query.get('to') || '')
         setPickupTime(query.get('time') || '')
         setPickupTimeWish(query.get('wish') || '')
-        setPaymentMethod(query.get('payment') === 'online' ? 'online' : 'cash')
+        setPaymentMethod('cash')
 
         const { data: pickupSettings, error: pickupSettingsError } = await supabase
           .from('trailer_pickup_settings')
